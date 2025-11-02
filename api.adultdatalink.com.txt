@@ -1,0 +1,654 @@
+GET
+/functions/download-video
+Stream an MP4 file as a download
+
+
+
+GET
+/functions/stream-video
+Stream Video
+
+auntmia
+
+
+GET
+/auntmia/feed
+Get Auntmia Feed
+
+
+GET
+/auntmia/search-by-category
+Get Category Search
+
+
+GET
+/auntmia/scrape-gallery
+Scrape Gallery Route
+
+
+GET
+/auntmia/search-by-model
+Get Model Search
+
+
+GET
+/auntmia/search
+Get Search
+
+
+GET
+/auntmia/search-pornstars
+Search Pornstars Route
+
+barelist
+
+
+GET
+/barelist/feed
+Feed
+
+
+GET
+/barelist/video-information
+Retrieve detailed information about a Barelist video
+
+
+GET
+/barelist/search
+Search Barelist for models, scenes, pictures, or videos
+
+
+GET
+/barelist/pornstar-information
+Retrieve detailed information about a Barelist pornstar
+
+boobpedia
+
+
+GET
+/boobpedia/search-model-by-features
+Retrieve a list of performers from Boobpedia for a single category
+
+
+GET
+/boobpedia/pornstar-information
+Retrieve details of a specific performer from Boobpedia
+
+Performers List
+
+
+GET
+/boobpedia/search-model-by-features
+Retrieve a list of performers from Boobpedia for a single category
+
+Performer Details
+
+
+GET
+/boobpedia/pornstar-information
+Retrieve details of a specific performer from Boobpedia
+
+eporner
+
+
+GET
+/eporner/search
+Get Eporner Search
+
+
+GET
+/eporner/video
+Get Eporner Video By Id
+
+
+GET
+/eporner/model-information
+Get Eporner Model Information
+
+
+GET
+/eporner/video-information
+Retrieve detailed information about a video
+
+
+GET
+/eporner/gifs
+Retrieve list of GIF galleries from Eporner
+
+
+GET
+/eporner/gif-gallery-information
+Retrieve detailed information about a GIF/photo gallery
+
+erome
+
+
+GET
+/erome/home
+Retrieve album metadata from Erome homepage
+
+
+GET
+/erome/album
+Retrieve detailed metadata from an Erome album
+
+
+GET
+/erome/search
+Retrieve album metadata from Erome search results
+
+
+GET
+/erome/user
+Retrieve user profile metadata from Erome
+
+freeones
+
+
+GET
+/freeones/model-information
+Get Model Information
+
+letsjerktv
+
+
+GET
+/letsjerktv/feed
+Get Letsjerktv Feed
+
+
+GET
+/letsjerktv/categories
+Get Letsjerktv Categories
+
+
+GET
+/letsjerktv/category-videos
+Get Letsjerktv Category Videos
+
+
+GET
+/letsjerktv/video-information
+Retrieve detailed information about a specific LetsJerk.tv video
+
+
+GET
+/letsjerktv/pornstars
+Get Letsjerktv Pornstars
+
+
+GET
+/letsjerktv/pornstar-videos
+Get Letsjerktv Pornstar Videos
+
+
+GET
+/letsjerktv/search
+Search Letsjerktv Videos
+
+Video Information
+
+
+GET
+/letsjerktv/video-information
+Retrieve detailed information about a specific LetsJerk.tv video
+
+
+GET
+/xhamster/video-information
+Retrieve detailed information about a specific xHamster video
+
+
+GET
+/xnxx/video-information
+Retrieve detailed information about a specific XNXX video
+
+
+GET
+/xvideos/video-information
+Retrieve detailed information about a specific Xvideos video
+
+pimpandhost
+
+
+GET
+/pimpandhost/categories
+Get Pimpandhost Tags
+
+
+GET
+/pimpandhost/pornstars
+Get Pimpandhost Pornstars
+
+
+GET
+/pimpandhost/gifs
+Get Pimpandhost Gifs
+
+
+GET
+/pimpandhost/category-media
+Get Pimpandhost Category Media
+
+
+GET
+/pimpandhost/pornstar-media
+Get Pimpandhost Pornstar Media
+
+
+GET
+/pimpandhost/trending-images
+Get Pimpandhost Trending Images
+
+pornhub
+
+
+GET
+/pornhub/get-video-by-id
+Get Video By Id
+
+
+GET
+/pornhub/search
+Search
+
+pornpics
+
+
+GET
+/pornpics/tags
+Get Pornpics Tags
+
+
+GET
+/pornpics/tag-image-links
+Get Pornpics Image Links
+
+
+GET
+/pornpics/gallery-image-links
+Get Pornpics Gallery Links
+
+
+GET
+/pornpics/search
+Search Pornpics
+
+pornstar
+
+
+GET
+/pornstar/social-profiles
+Get Social Profiles
+
+
+GET
+/pornstar/pornstar-data
+Retrieve aggregated pornstar biography data from multiple platforms
+
+Pornstar Data
+
+
+GET
+/pornstar/pornstar-data
+Retrieve aggregated pornstar biography data from multiple platforms
+
+redgifs
+
+
+GET
+/redgifs/feed
+Retrieve top weekly RedGifs content
+
+
+GET
+/redgifs/trending
+Retrieve trending RedGifs content
+
+
+GET
+/redgifs/gif
+Retrieve a specific RedGifs GIF
+
+
+GET
+/redgifs/tags
+Retrieve RedGifs tags
+
+
+GET
+/redgifs/creator
+Retrieve a RedGifs creator's profile
+
+
+GET
+/redgifs/search
+Search for RedGifs media
+
+
+GET
+/redgifs/tag-suggestions
+Retrieve RedGifs tag suggestions
+
+
+GET
+/redgifs/creators
+Retrieve a list of RedGifs creators
+
+
+GET
+/redgifs/web-urls
+Retrieve RedGifs GIF web URLs
+
+
+GET
+/redgifs/embed-url
+Convert RedGifs web URL to embed URL
+
+rule34
+
+
+GET
+/rule34/posts
+Get Rule34 Posts
+
+
+GET
+/rule34/deleted-posts
+Get Rule34 Deleted Posts
+
+
+GET
+/rule34/comments
+Get Rule34 Comments
+
+
+GET
+/rule34/tags
+Get Rule34 Tags
+
+
+GET
+/rule34/autocomplete
+Get Rule34 Autocomplete
+
+redtube
+
+
+GET
+/redtube/search
+Search for videos
+
+
+GET
+/redtube/video
+Retrieve video details by ID
+
+
+GET
+/redtube/is-video-active
+Check if a video is active
+
+
+GET
+/redtube/video-embed-code
+Retrieve video embed code
+
+
+GET
+/redtube/deleted-videos
+Retrieve list of deleted videos
+
+
+GET
+/redtube/categories
+Retrieve list of video categories
+
+
+GET
+/redtube/tags
+Retrieve list of tags
+
+
+GET
+/redtube/stars
+Retrieve list of stars
+
+
+GET
+/redtube/stars-detailed
+Retrieve detailed list of stars
+
+sexstories
+
+
+GET
+/sexstories/home
+Get Sexstories Home
+
+
+GET
+/sexstories/themes
+Get Sexstories Themes
+
+
+GET
+/sexstories/genres
+Get Sexstories Genres
+
+
+GET
+/sexstories/updates
+Get Sexstories Updates
+
+
+GET
+/sexstories/authors
+Get Sexstories Authors
+
+
+GET
+/sexstories/story
+Get Sexstory Details
+
+
+GET
+/sexstories/search
+Search Sexstories
+
+motherless
+
+
+GET
+/motherless/search
+Retrieve media search results from Motherless
+
+
+GET
+/motherless/video
+Retrieve detailed information about a video
+
+
+GET
+/motherless/galleries
+Retrieve galleries by type
+
+
+GET
+/motherless/gallery
+Retrieve detailed information about a gallery
+
+
+GET
+/motherless/images
+Retrieve images by type
+
+
+GET
+/motherless/image
+Retrieve detailed information about an image
+
+tnaflix
+
+
+GET
+/tnaflix/feed
+Get Tnaflix Feed
+
+
+GET
+/tnaflix/categories
+Get Tnaflix Categories
+
+
+GET
+/tnaflix/search
+Get Tnaflix Search
+
+
+GET
+/tnaflix/video-info
+Scrape detailed video information from a Tnaflix video URL
+
+xhamster
+
+
+GET
+/xhamster/video-information
+Retrieve detailed information about a specific xHamster video
+
+
+GET
+/xhamster/videos
+Retrieve a list of videos from xHamster with filters and pagination
+
+
+GET
+/xhamster/search
+Search xHamster videos with advanced filtering and pagination
+
+
+GET
+/xhamster/pornstar-information
+Retrieve information about a specific xHamster pornstar with pagination
+
+
+GET
+/xhamster/photo-categories
+Retrieve photo categories from xHamster with optional letter filter and limit
+
+
+GET
+/xhamster/category-results
+Retrieve photo gallery results for a specific xHamster category
+
+
+GET
+/xhamster/gallery-information
+Retrieve detailed information about a specific xHamster gallery
+
+Videos List
+
+
+GET
+/xhamster/videos
+Retrieve a list of videos from xHamster with filters and pagination
+
+Search Videos
+
+
+GET
+/xhamster/search
+Search xHamster videos with advanced filtering and pagination
+
+Pornstar Information
+
+
+GET
+/xhamster/pornstar-information
+Retrieve information about a specific xHamster pornstar with pagination
+
+Photo Categories
+
+
+GET
+/xhamster/photo-categories
+Retrieve photo categories from xHamster with optional letter filter and limit
+
+Category Results
+
+
+GET
+/xhamster/category-results
+Retrieve photo gallery results for a specific xHamster category
+
+Gallery Information
+
+
+GET
+/xhamster/gallery-information
+Retrieve detailed information about a specific xHamster gallery
+
+xnxx
+
+
+GET
+/xnxx/todays-selection
+Fetch Todays Selection Route
+
+
+GET
+/xnxx/best-videos
+Fetch Best Videos Route
+
+
+GET
+/xnxx/hits
+Fetch Hits Route
+
+
+GET
+/xnxx/search
+Search Route
+
+
+GET
+/xnxx/tags
+Fetch Tags Route
+
+
+GET
+/xnxx/video-information
+Retrieve detailed information about a specific XNXX video
+
+xvideos
+
+
+GET
+/xvideos/feed
+Retrieve the Xvideos feed
+
+
+GET
+/xvideos/search
+Search for videos on Xvideos
+
+
+GET
+/xvideos/pornstar
+Retrieve pornstar information from Xvideos
+
+
+GET
+/xvideos/categories
+Retrieve Xvideos categories
+
+
+GET
+/xvideos/pornstars-index
+Retrieve a paginated index of pornstars from Xvideos
+
+
+GET
+/xvideos/video-information
+Retrieve detailed information about a specific Xvideos video

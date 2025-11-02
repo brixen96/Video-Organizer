@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Storage AI</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand">Video Storage AI</div>
+        <ul class="nav-list nav-left">
+            <li><a href="#dashboard">Dashboard</a></li>
+            <li><a href="#scenes">Scenes</a></li>
+            <li><a href="#groups">Groups</a></li>
+            <li><a href="#studios">Studios</a></li>
+            <li><a href="#performers">Performers</a></li>
+            <li><a href="#tags">Tags</a></li>
+            <li><a href="#markers">Markers</a></li>
+        </ul>
+        <ul class="nav-list nav-right">
+            <li><a href="#logs">Logs</a></li>
+            <li><a href="#settings">Settings</a></li>
+        </ul>
+    </nav>
+    <main class="main-content">
+        <div id="scenes-page" class="page active">
+            <div class="video-grid" id="video-grid">
+                <!-- Video thumbnails will be inserted here by JavaScript -->
+            </div>
+        </div>
+
+        <div id="settings-page" class="page hidden">
+            <h2>Settings</h2>
+            <div class="tabs">
+                <div class="tab-buttons">
+                    <button class="tab-button active" data-tab="tasks">Tasks</button>
+                    <button class="tab-button" data-tab="libraries">Libraries</button>
+                    <button class="tab-button" data-tab="interface">Interface</button>
+                    <button class="tab-button" data-tab="metadata">Metadata Providers</button>
+                    <button class="tab-button" data-tab="tools">Tools</button>
+                    <button class="tab-button" data-tab="changelog">Changelog</button>
+                </div>
+                <div class="tab-content">
+                    <div id="tasks" class="tab-pane active">
+                        <h3>Tasks Settings</h3>
+                        <p>Content for Tasks settings...</p>
+                        <button id="update-performer-previews-button">Update Performer Previews</button>
+                        <p id="update-performer-previews-status"></p>
+                        <button id="refetch-all-performer-metadata-button">Re-fetch All Performer Metadata</button>
+                        <p id="refetch-all-performer-metadata-status"></p>
+                    </div>
+                    <div id="libraries" class="tab-pane hidden">
+                        <h3>Libraries Settings</h3>
+                        <p>Content for Libraries settings...</p>
+                    </div>
+                    <div id="interface" class="tab-pane hidden">
+                        <h3>Interface Settings</h3>
+                        <p>Content for Interface settings...</p>
+                    </div>
+                    <div id="metadata" class="tab-pane hidden">
+                        <h3>Metadata Providers Settings</h3>
+                        <p>Content for Metadata Providers settings...</p>
+                    </div>
+                    <div id="tools" class="tab-pane hidden">
+                        <h3>Tools Settings</h3>
+                        <p>Content for Tools settings...</p>
+                    </div>
+                    <div id="changelog" class="tab-pane hidden">
+                        <h3>Changelog</h3>
+                        <p>Content for Changelog...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="logs-page" class="page hidden">
+            <h2>Application Logs</h2>
+            <div class="tabs">
+                <div class="tab-buttons">
+                    <button class="tab-button active" data-tab="current-logs">Current Logs</button>
+                    <button class="tab-button" data-tab="previous-logs">Previous Logs</button>
+                    <button class="tab-button" data-tab="ai-logs">AI Logs</button>
+                </div>
+                <div class="tab-content">
+                    <div id="current-logs" class="tab-pane active">
+                        <h3>Current Logs</h3>
+                        <pre id="log-output"></pre>
+                    </div>
+                    <div id="previous-logs" class="tab-pane hidden">
+                        <h3>Previous Logs</h3>
+                        <div id="previous-logs-list"></div>
+                        <pre id="previous-log-content"></pre>
+                    </div>
+                    <div id="ai-logs" class="tab-pane hidden">
+                        <h3>AI Logs</h3>
+                        <pre>Content for AI Logs...</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="performers-page" class="page hidden">
+            <div class="filter-bar" id="performer-filter-bar">
+                <div class="filter-group">
+                    <label for="performer-sort-by">Sort by:</label>
+                    <select id="performer-sort-by">
+                        <option value="name-asc">Name (A-Z)</option>
+                        <option value="name-desc">Name (Z-A)</option>
+                        <option value="age-desc">Age (Oldest-Youngest)</option>
+                        <option value="age-asc">Age (Youngest-Oldest)</option>
+                        <option value="cup-desc">Breast Size (Large-Small)</option>
+                        <option value="cup-asc">Breast Size (Small-Large)</option>
+                        <option value="height-desc">Height (Tall-Short)</option>
+                        <option value="height-asc">Height (Short-Tall)</option>
+                        <option value="rating-desc">Rating (High-Low)</option>
+                        <option value="rating-asc">Rating (Low-High)</option>
+                        <option value="total-views-desc">Total Views (High-Low)</option>
+                        <option value="total-views-asc">Total Views (Low-High)</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="performer-filter-zoo">Zoo:</label>
+                    <select id="performer-filter-zoo">
+                        <option value="all">All</option>
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Age:</label>
+                    <input type="number" id="age-min" placeholder="Min">
+                    <span>-</span>
+                    <input type="number" id="age-max" placeholder="Max">
+                </div>
+                <div class="filter-group">
+                    <label>Breast Size:</label>
+                    <input type="text" id="cup-min" placeholder="Min">
+                    <span>-</span>
+                    <input type="text" id="cup-max" placeholder="Max">
+                </div>
+                <div class="filter-group">
+                    <label>Height:</label>
+                    <input type="number" id="height-min" placeholder="Min">
+                    <span>-</span>
+                    <input type="number" id="height-max" placeholder="Max">
+                </div>
+            </div>
+            <div class="performers-content">
+                <div class="performer-wall" id="performer-wall">
+                    <!-- Performer thumbnails will be inserted here by JavaScript -->
+                </div>
+                <div class="performer-details-panel" id="performer-details-panel">
+                <span class="close-details-button">&times;</span>
+                <div class="performer-carousel" id="performer-carousel">
+                    <!-- Large focused video and horizontal menu will be here -->
+                </div>
+                <div class="performer-info-tabs">
+                    <div class="tab-buttons">
+                        <button class="tab-button active" data-tab="performer-profile">Profile</button>
+                        <button class="tab-button" data-tab="performer-scenes">Scenes</button>
+                        <button class="tab-button" data-tab="performer-appearance">Appearance</button>
+                        <button class="tab-button" data-tab="performer-tags">Tags</button>
+                        <button class="tab-button" data-tab="performer-bios">Bios</button>
+                        <button class="tab-button" data-tab="performer-other-info">Other Info</button>
+                    </div>
+                    <div class="tab-content">
+                        <div id="performer-profile" class="tab-pane active">
+                            <h3>Profile</h3>
+                            <div id="performer-profile-content"></div>
+                        </div>
+                        <div id="performer-scenes" class="tab-pane hidden">
+                            <h3>Scenes</h3>
+                            <div id="performer-scenes-content" class="video-grid"></div>
+                        </div>
+                        <div id="performer-appearance" class="tab-pane hidden">
+                            <h3>Appearance</h3>
+                            <div id="performer-appearance-content"></div>
+                        </div>
+                        <div id="performer-tags" class="tab-pane hidden">
+                            <h3>Tags</h3>
+                            <div id="performer-tags-content"></div>
+                        </div>
+                        <div id="performer-bios" class="tab-pane hidden">
+                            <h3>Bios</h3>
+                            <div id="performer-bios-content"></div>
+                        </div>
+                        <div id="performer-other-info" class="tab-pane hidden">
+                            <h3>Other Info</h3>
+                            <div id="performer-other-info-content"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="video-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <div class="modal-video-container">
+                <video id="modal-video-player" controls></video>
+            </div>
+            <div class="modal-details-panel">
+                <h2>Details</h2>
+                <div id="modal-video-details"></div>
+            </div>
+        </div>
+    </div>
+
+    <button id="chat-toggle-button">🤖</button>
+    <div id="chat-container" class="hidden">
+        <div id="chat-header">AI Companion</div>
+        <div id="chat-messages"></div>
+        <div id="chat-input-container">
+            <input type="text" id="chat-input" placeholder="Ask me anything...">
+            <button id="chat-send-button">Send</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <div id="context-menu" class="context-menu">
+        <ul>
+            <li id="set-as-default-button">Set as default</li>
+            <li id="fetch-metadata-button">Fetch Metadata</li>
+        </ul>
+    </div>
+</body>
+</html>
