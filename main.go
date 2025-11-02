@@ -472,6 +472,65 @@ func performerDetailsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Handle set-zoo action
+	if strings.HasSuffix(performerName, "/set-zoo") {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		performerName = strings.TrimSuffix(performerName, "/set-zoo")
+		if performerName == "" {
+			http.Error(w, "Performer name not specified", http.StatusBadRequest)
+			return
+		}
+
+		var payload struct {
+			Zoo string `json:"zoo"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		var performerJSON string
+		err := db.QueryRow("SELECT data FROM performers WHERE name = ?", performerName).Scan(&performerJSON)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Performer not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			log.Printf("Failed to query performer %s from database: %v", performerName, err)
+			http.Error(w, "Failed to retrieve performer details", http.StatusInternalServerError)
+			return
+		}
+
+		var performer Performer
+		if err := json.Unmarshal([]byte(performerJSON), &performer); err != nil {
+			log.Printf("Failed to unmarshal performer JSON for %s: %v", performerName, err)
+			http.Error(w, "Failed to process performer data", http.StatusInternalServerError)
+			return
+		}
+
+		performer.Zoo = payload.Zoo
+
+		updatedPerformerJSON, err := json.Marshal(performer)
+		if err != nil {
+			log.Printf("Failed to marshal updated performer %s to JSON: %v", performerName, err)
+			http.Error(w, "Failed to update performer data", http.StatusInternalServerError)
+			return
+		}
+
+		_, err = db.Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), performerName)
+		if err != nil {
+			log.Printf("Failed to update performer %s in database: %v", performerName, err)
+			http.Error(w, "Failed to save zoo status", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Zoo status updated successfully"})
+		return
+	}
+
 	// Existing logic for GET performer details
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

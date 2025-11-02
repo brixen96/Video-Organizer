@@ -452,18 +452,25 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Helper function to render key-value pairs from an object
-    const renderKeyValuePairs = (data, containerDiv) => {
+    const renderKeyValuePairs = (data, containerDiv, iconMap) => {
         if (!data || Object.keys(data).length === 0) {
             containerDiv.innerHTML = '<p>No data available.</p>';
             return;
         }
-        let html = '<ul>';
+        let html = '<div class="profile-details-grid">';
         for (const key in data) {
             if (data[key] && data[key] !== 'Undefined' && data[key] !== null && data[key] !== 0) {
-                html += `<li><strong>${key.replace(/_/g, ' ')}:</strong> ${data[key]}</li>`;
+                const icon = iconMap && iconMap[key] ? iconMap[key] : ''
+                html += `
+                    <div class="detail-item">
+                        <span class="detail-icon">${icon}</span>
+                        <span class="detail-label">${key.replace(/_/g, ' ')}:</span>
+                        <span class="detail-value">${data[key]}</span>
+                    </div>
+                `;
             }
         }
-        html += '</ul>';
+        html += '</div>';
         containerDiv.innerHTML = html;
     };
 
@@ -493,35 +500,79 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const renderPerformerProfile = (performer, contentDiv) => {
+        const isZoo = performer.zoo === 'true';
+
         let profileHtml = `
             <h3>${performer.name}</h3>
-            <p>Aliases: ${performer.aliases || 'N/A'}</p>
-            <p>Scene Count: ${performer.scene_count}</p>
-            <p>Zoo: ${performer.zoo || 'N/A'}</p>
+            <div class="profile-details-grid">
+                <div class="detail-item">
+                    <span class="detail-icon">👥</span>
+                    <span class="detail-label">Aliases:</span>
+                    <span class="detail-value">${performer.aliases || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-icon">🎬</span>
+                    <span class="detail-label">Scene Count:</span>
+                    <span class="detail-value">${performer.scene_count}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-icon">🐾</span>
+                    <span class="detail-label">Zoo:</span>
+                    <div class="zoo-toggle-switch ${isZoo ? 'active' : ''}" id="zoo-toggle">
+                        <div class="toggle-slider"></div>
+                    </div>
+                </div>
         `;
 
-        // Add other top-level fields
         const otherFields = [
-            { label: 'Feature Dancer', key: 'feature_dancer' },
-            { label: 'Date of Birth', key: 'date_of_birth' },
-            { label: 'Age', key: 'age' },
-            { label: 'Astrological Sign', key: 'astrological_sign' },
-            { label: 'Career Status', key: 'career_status' },
-            { label: 'Career Start', key: 'career_start' },
-            { label: 'Career End', key: 'career_end' },
-            { label: 'Place of Birth', key: 'place_of_birth' },
-            { label: 'Nationality', key: 'nationality' },
-            { label: 'Rank', key: 'rank' },
-            { label: 'Country', key: 'country' },
+            { label: 'Feature Dancer', key: 'feature_dancer', icon: '⭐' },
+            { label: 'Date of Birth', key: 'date_of_birth', icon: '🎂' },
+            { label: 'Age', key: 'age', icon: '🔞' },
+            { label: 'Astrological Sign', key: 'astrological_sign', icon: '♈' },
+            { label: 'Career Status', key: 'career_status', icon: '📈' },
+            { label: 'Career Start', key: 'career_start', icon: '🏁' },
+            { label: 'Career End', key: 'career_end', icon: '🛑' },
+            { label: 'Place of Birth', key: 'place_of_birth', icon: '🌍' },
+            { label: 'Nationality', key: 'nationality', icon: '🏳️' },
+            { label: 'Rank', key: 'rank', icon: '🏆' },
+            { label: 'Country', key: 'country', icon: '🗺️' },
         ];
 
         otherFields.forEach(field => {
             if (performer[field.key] && performer[field.key] !== 'Undefined' && performer[field.key] !== null && performer[field.key] !== 0) {
-                profileHtml += `<p><strong>${field.label}:</strong> ${performer[field.key]}</p>`;
+                profileHtml += `
+                    <div class="detail-item">
+                        <span class="detail-icon">${field.icon}</span>
+                        <span class="detail-label">${field.label}:</span>
+                        <span class="detail-value">${performer[field.key]}</span>
+                    </div>
+                `;
             }
         });
 
+        profileHtml += `</div>`;
+
         contentDiv.innerHTML = profileHtml;
+
+        const zooToggle = contentDiv.querySelector('#zoo-toggle');
+        zooToggle.addEventListener('click', async () => {
+            const newZooStatus = !(performer.zoo === 'true');
+            try {
+                const response = await fetch(`/api/performers/${performer.name}/set-zoo`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ zoo: newZooStatus.toString() }),
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                performer.zoo = newZooStatus.toString(); // Update local performer object
+                zooToggle.classList.toggle('active'); // Update UI
+            } catch (error) {
+                console.error('Error updating zoo status:', error);
+                alert('Failed to update zoo status.');
+            }
+        });
     };
 
     const renderPerformerScenes = (performer, contentDiv) => {
@@ -546,141 +597,185 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const renderPerformerTags = (performer, contentDiv) => {
-        renderListItems(performer.tags, contentDiv);
+        if (!performer.tags || performer.tags.length === 0) {
+            contentDiv.innerHTML = '<p>No tags available.</p>';
+            return;
+        }
+        let html = '<div class="tags-container">';
+        performer.tags.forEach(tag => {
+            html += `<span class="tag-badge">#${tag}</span>`;
+        });
+        html += '</div>';
+        contentDiv.innerHTML = html;
     };
 
     const renderPerformerBios = (performer, contentDiv) => {
         if (!performer.bios || Object.keys(performer.bios).length === 0) {
-            contentDiv.innerHTML = '<p>No data available.</p>';
+            contentDiv.innerHTML = '<p>No bios available.</p>';
             return;
         }
-        let html = '';
+        let html = '<div class="bios-container">';
         for (const key in performer.bios) {
             if (performer.bios[key]) {
-                html += `<p><strong>${key.replace(/_/g, ' ')}:</strong> ${performer.bios[key]}</p>`;
+                html += `
+                    <div class="bio-card">
+                        <h4>${key.replace(/_/g, ' ')}</h4>
+                        <p>${performer.bios[key]}</p>
+                    </div>
+                `;
             }
         }
+        html += '</div>';
         contentDiv.innerHTML = html;
     };
 
 
 
     const renderPerformerAppearance = (performer, contentDiv) => {
-        renderKeyValuePairs(performer.appearance, contentDiv);
+        const appearanceIconMap = {
+            "ethnicity": "🌍",
+            "boobs": "🍈",
+            "bust": "📏",
+            "cup": "☕",
+            "bra": "👙",
+            "waist": "👖",
+            "hip": "💃",
+            "butt": "🍑",
+            "height": "📏",
+            "weight": "⚖️",
+            "hair_color": "ፀጉር",
+            "eye_color": "👁️",
+            "piercings": "💍",
+            "piercing_locations": "📍",
+            "tattoos": "🎨",
+            "tattoo_locations": "📍",
+            "shoe_size": "👟",
+            "body_type": "💪",
+            "underarm_hair": "🌿",
+            "pubic_hair": "🌿"
+        };
+        renderKeyValuePairs(performer.appearance, contentDiv, appearanceIconMap);
     };
 
-    const renderPerformerOtherInfo = (performer, contentDiv) => {
-        let html = '';
+        const renderPerformerOtherInfo = (performer, contentDiv) => {
 
-        // Performances
-        if (performer.performances && Object.keys(performer.performances).length > 0) {
-            html += '<h4>Performances:</h4>';
-            html += '<ul>';
-            for (const key in performer.performances) {
-                if (performer.performances[key] && performer.performances[key] !== 'Undefined' && performer.performances[key] !== null && performer.performances[key] !== 0) {
-                    html += `<li><strong>${key.replace(/_/g, ' ')}:</strong> ${performer.performances[key]}</li>`;
+            const renderOtherInfoSection = (title, icon, data) => {
+
+                if (!data || (typeof data === 'object' && Object.keys(data).length === 0) || (Array.isArray(data) && data.length === 0)) {
+
+                    return '';
+
                 }
-            }
-            html += '</ul>';
-        }
 
-        // Social Media
-        if (performer.social_media && Object.keys(performer.social_media).length > 0) {
-            html += '<h4>Social Media:</h4>';
-            html += '<ul>';
-            for (const key in performer.social_media) {
-                if (performer.social_media[key]) {
-                    html += `<li><strong>${key.replace(/_/g, ' ')}:</strong> <a href="${performer.social_media[key]}" target="_blank">${performer.social_media[key]}</a></li>`;
+    
+
+                let content = '';
+
+                if (Array.isArray(data)) { // For external_links
+
+                    content = '<ul>';
+
+                    data.forEach(item => {
+
+                        if (item.url) {
+
+                            content += `<li><a href="${item.url}" target="_blank">${item.text || item.url}</a></li>`;
+
+                        }
+
+                    });
+
+                    content += '</ul>';
+
+                } else if (typeof data === 'object') { // For performances, social_media, etc.
+
+                    content = '<ul>';
+
+                    for (const key in data) {
+
+                        if (data[key] && data[key] !== 'Undefined' && data[key] !== null && data[key] !== 0) {
+
+                            let value = data[key];
+
+                            if (key.toLowerCase().includes('url') || key.toLowerCase().includes('link') || (typeof value === 'string' && value.startsWith('http'))) {
+
+                                value = `<a href="${value}" target="_blank">${value}</a>`;
+
+                            }
+
+                            content += `<li><strong>${key.replace(/_/g, ' ')}:</strong> ${value}</li>`;
+
+                        }
+
+                    }
+
+                    content += '</ul>';
+
+                } else { // For subscribers, rating, etc.
+
+                    content = `<p>${data}</p>`;
+
                 }
-            }
-            html += '</ul>';
-        }
 
-        // Platform Views
-        if (performer.platform_views && Object.keys(performer.platform_views).length > 0) {
-            html += '<h4>Platform Views:</h4>';
-            html += '<ul>';
-            for (const key in performer.platform_views) {
-                if (performer.platform_views[key] && performer.platform_views[key] !== 'Undefined' && performer.platform_views[key] !== null && performer.platform_views[key] !== 0) {
-                    html += `<li><strong>${key.replace(/_/g, ' ')}:</strong> ${performer.platform_views[key]}</li>`;
-                }
-            }
-            html += '</ul>';
-        }
+    
 
-        // Platform Video Counts
-        if (performer.platform_video_counts && Object.keys(performer.platform_video_counts).length > 0) {
-            html += '<h4>Platform Video Counts:</h4>';
-            html += '<ul>';
-            for (const key in performer.platform_video_counts) {
-                if (performer.platform_video_counts[key] && performer.platform_video_counts[key] !== 'Undefined' && performer.platform_video_counts[key] !== null && performer.platform_video_counts[key] !== 0) {
-                    html += `<li><strong>${key.replace(/_/g, ' ')}:</strong> ${performer.platform_video_counts[key]}</li>`;
-                }
-            }
-            html += '</ul>';
-        }
+                return `
 
-        // Platform Profile Counts
-        if (performer.platform_profile_counts && Object.keys(performer.platform_profile_counts).length > 0) {
-            html += '<h4>Platform Profile Counts:</h4>';
-            html += '<ul>';
-            for (const key in performer.platform_profile_counts) {
-                if (performer.platform_profile_counts[key] && performer.platform_profile_counts[key] !== 'Undefined' && performer.platform_profile_counts[key] !== null && performer.platform_profile_counts[key] !== 0) {
-                    html += `<li><strong>${key.replace(/_/g, ' ')}:</strong> ${performer.platform_profile_counts[key]}</li>`;
-                }
-            }
-            html += '</ul>';
-        }
+                    <div class="info-card">
 
-        // Platform Profile Counts
-        if (performer.platform_profile_counts && Object.keys(performer.platform_profile_counts).length > 0) {
-            html += '<h4>Platform Profile Counts:</h4>';
-            html += '<ul>';
-            for (const key in performer.platform_profile_counts) {
-                if (performer.platform_profile_counts[key] && performer.platform_profile_counts[key] !== 'Undefined' && performer.platform_profile_counts[key] !== null && performer.platform_profile_counts[key] !== 0) {
-                    html += `<li><strong>${key.replace(/_/g, ' ')}:</strong> ${performer.platform_profile_counts[key]}</li>`;
-                }
-            }
-            html += '</ul>';
-        }
-		// Subscribers
-		if (performer.subscribers && performer.subscribers !== 0) {
-			html += `<p><strong>Subscribers:</strong> ${performer.subscribers}</p>`;
-		}
+                        <div class="info-card-header">
 
-		// Rating
-		if (performer.rating && performer.rating !== 0) {
-			html += `<p><strong>Rating:</strong> ${performer.rating}</p>`;
-		}
+                            <span class="info-card-icon">${icon}</span>
 
-		// Total Views
-		if (performer.total_views && performer.total_views !== 0) {
-			html += `<p><strong>Total Views:</strong> ${performer.total_views}</p>`;
-		}
+                            <h4>${title}</h4>
 
-		// Total Video Count
-		if (performer.total_video_count && performer.total_video_count !== 0) {
-			html += `<p><strong>Total Video Count:</strong> ${performer.total_video_count}</p>`;
-		}
+                        </div>
 
-		// Total Platform Hits
-		if (performer.total_platform_hits && performer.total_platform_hits !== 0) {
-			html += `<p><strong>Total Platform Hits:</strong> ${performer.total_platform_hits}</p>`;
-		}
+                        <div class="info-card-content">
 
-        // External Links
-        if (performer.external_links && performer.external_links.length > 0) {
-            html += '<h4>External Links:</h4><ul>';
-            performer.external_links.forEach(link => {
-                if (link.url) {
-                    html += `<li><a href="${link.url}" target="_blank">${link.text || link.url}</a></li>`;
-                }
-            });
-            html += '</ul>';
-        }
+                            ${content}
 
-        contentDiv.innerHTML = html;
-    };
+                        </div>
+
+                    </div>
+
+                `;
+
+            };
+
+    
+
+            let html = '<div class="other-info-container">';
+
+            html += renderOtherInfoSection('Performances', '💃', performer.performances);
+
+            html += renderOtherInfoSection('Social Media', '📱', performer.social_media);
+
+            html += renderOtherInfoSection('Platform Views', '👀', performer.platform_views);
+
+            html += renderOtherInfoSection('Platform Video Counts', '📹', performer.platform_video_counts);
+
+            html += renderOtherInfoSection('Platform Profile Counts', '👥', performer.platform_profile_counts);
+
+            html += renderOtherInfoSection('Subscribers', '📈', performer.subscribers);
+
+            html += renderOtherInfoSection('Rating', '⭐', performer.rating);
+
+            html += renderOtherInfoSection('Total Views', '🔥', performer.total_views);
+
+            html += renderOtherInfoSection('Total Video Count', '🎥', performer.total_video_count);
+
+            html += renderOtherInfoSection('Total Platform Hits', '💥', performer.total_platform_hits);
+
+            html += renderOtherInfoSection('External Links', '🔗', performer.external_links);
+
+            html += '</div>';
+
+    
+
+            contentDiv.innerHTML = html;
+
+        };
 
     const displayLogs = () => {
         const logOutput = document.getElementById('current-logs').querySelector('pre');
