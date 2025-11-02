@@ -104,64 +104,66 @@ type VideoInfo struct {
 
 var db *sql.DB
 
-var defaultPerformer Performer = Performer{
-	Appearance: map[string]interface{}{
-		"ethnicity":         "Undefined",
-		"boobs":             "Undefined",
-		"bust":              "Undefined",
-		"cup":               "Undefined",
-		"bra":               "Undefined",
-		"waist":             "Undefined",
-		"hip":               "Undefined",
-		"butt":              "Undefined",
-		"height":            "Undefined",
-		"weight":            "Undefined",
-		"hair_color":        "Undefined",
-		"eye_color":         "Undefined",
-		"piercings":         "Undefined",
-		"piercing_locations": "Undefined",
-		"tattoos":           "Undefined",
-		"tattoo_locations":  "Undefined",
-		"shoe_size":         "Undefined",
-		"body_type":         "Undefined",
-		"underarm_hair":     "Undefined",
-		"pubic_hair":        "Undefined",
-	},
-	Performances:        make(map[string]interface{}),
-	SocialMedia:         make(map[string]interface{}),
-	PlatformViews:       make(map[string]interface{}),
-	PlatformVideoCounts: make(map[string]interface{}),
-	PlatformProfileCounts: make(map[string]interface{}),
-	Tags:                []string{},
-	ExternalLinks:       []map[string]string{},
-	Bios:                make(map[string]string),
-	OfficialWebsite:     "Undefined",
-	FeatureDancer:       "Undefined",
-	DateOfBirth:         "Undefined",
-	Age:                 "Undefined",	
-	SexualOrientation:   "Undefined",
-	AstrologicalSign:    "Undefined",
-	Profession:          "Undefined",
-	CareerStatus:        "Undefined",
-	CareerStart:         "Undefined",
-	CareerEnd:           "Undefined",
-	DateOfDeath:         "Undefined",
-	PlaceOfBirth:        "Undefined",
-	Nationality:         "Undefined",
-	Rank:                "Undefined",
-	Country:             "Undefined",
-	Avatar:              "Undefined",
-	Subscribers:         0,
-	Rating:              0,
-	TotalViews:          0,
-	TotalVideoCount:     0,
-	TotalPlatformHits:   0,
-	Aliases:             []string{},
-	ImageURL:            "Undefined",
-	SceneCount:          0,
-	Previews:            []string{},
-	DefaultPreview:      "",
-	Zoo:                 "undefined",
+func newDefaultPerformer() Performer {
+	return Performer{
+		Appearance: map[string]interface{}{
+			"ethnicity":         "Undefined",
+			"boobs":             "Undefined",
+			"bust":              "Undefined",
+			"cup":               "Undefined",
+			"bra":               "Undefined",
+			"waist":             "Undefined",
+			"hip":               "Undefined",
+			"butt":              "Undefined",
+			"height":            "Undefined",
+			"weight":            "Undefined",
+			"hair_color":        "Undefined",
+			"eye_color":         "Undefined",
+			"piercings":         "Undefined",
+			"piercing_locations": "Undefined",
+			"tattoos":           "Undefined",
+			"tattoo_locations":  "Undefined",
+			"shoe_size":         "Undefined",
+			"body_type":         "Undefined",
+			"underarm_hair":     "Undefined",
+			"pubic_hair":        "Undefined",
+		},
+		Performances:        make(map[string]interface{}),
+		SocialMedia:         make(map[string]interface{}),
+		PlatformViews:       make(map[string]interface{}),
+		PlatformVideoCounts: make(map[string]interface{}),
+		PlatformProfileCounts: make(map[string]interface{}),
+		Tags:                []string{},
+		ExternalLinks:       []map[string]string{},
+		Bios:                make(map[string]string),
+		OfficialWebsite:     "Undefined",
+		FeatureDancer:       "Undefined",
+		DateOfBirth:         "Undefined",
+		Age:                 "Undefined",
+		SexualOrientation:   "Undefined",
+		AstrologicalSign:    "Undefined",
+		Profession:          "Undefined",
+		CareerStatus:        "Undefined",
+		CareerStart:         "Undefined",
+		CareerEnd:           "Undefined",
+		DateOfDeath:         "Undefined",
+		PlaceOfBirth:        "Undefined",
+		Nationality:         "Undefined",
+		Rank:                "Undefined",
+		Country:             "Undefined",
+		Avatar:              "Undefined",
+		Subscribers:         0,
+		Rating:              0,
+		TotalViews:          0,
+		TotalVideoCount:     0,
+		TotalPlatformHits:   0,
+		Aliases:             []string{},
+		ImageURL:            "Undefined",
+		SceneCount:          0,
+		Previews:            []string{},
+		DefaultPreview:      "",
+		Zoo:                 "undefined",
+	}
 }
 
 func setupLogging() {
@@ -242,7 +244,7 @@ func updateExistingPerformersSchema() {
 			continue
 		}
 
-		newPerformer := defaultPerformer // Start with the default template
+		newPerformer := newDefaultPerformer() // Start with the default template
 		newPerformer.Name = name         // Keep the existing name
 
 		// Unmarshal old JSON directly into newPerformer to preserve existing fields
@@ -528,6 +530,141 @@ func performerDetailsHandler(w http.ResponseWriter, r *http.Request) {
 
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Zoo status updated successfully"})
+		return
+	}
+
+	// Handle reset-metadata action
+	if strings.HasSuffix(performerName, "/reset-metadata") {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		performerName = strings.TrimSuffix(performerName, "/reset-metadata")
+		if performerName == "" {
+			http.Error(w, "Performer name not specified", http.StatusBadRequest)
+			return
+		}
+
+		var performerJSON string
+		err := db.QueryRow("SELECT data FROM performers WHERE name = ?", performerName).Scan(&performerJSON)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Performer not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			log.Printf("Failed to query performer %s from database: %v", performerName, err)
+			http.Error(w, "Failed to retrieve performer details", http.StatusInternalServerError)
+			return
+		}
+
+		var existingPerformer Performer
+		if err := json.Unmarshal([]byte(performerJSON), &existingPerformer); err != nil {
+			log.Printf("Failed to unmarshal performer JSON for %s: %v", performerName, err)
+			http.Error(w, "Failed to process performer data", http.StatusInternalServerError)
+			return
+		}
+
+		newPerformer := newDefaultPerformer()
+		newPerformer.Name = existingPerformer.Name
+		newPerformer.Zoo = existingPerformer.Zoo
+		newPerformer.Previews = existingPerformer.Previews
+		newPerformer.DefaultPreview = existingPerformer.DefaultPreview
+
+		if newPerformer.Zoo == "true" {
+			newPerformer.Profession = "Bestiality"
+		}
+
+		updatedPerformerJSON, err := json.Marshal(newPerformer)
+		if err != nil {
+			log.Printf("Failed to marshal updated performer %s to JSON: %v", performerName, err)
+			http.Error(w, "Failed to update performer data", http.StatusInternalServerError)
+			return
+		}
+
+		_, err = db.Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), performerName)
+		if err != nil {
+			log.Printf("Failed to update performer %s in database: %v", performerName, err)
+			http.Error(w, "Failed to reset metadata", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Metadata reset successfully"})
+		return
+	}
+
+	// Handle reset-previews action
+	if strings.HasSuffix(performerName, "/reset-previews") {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		performerName = strings.TrimSuffix(performerName, "/reset-previews")
+		if performerName == "" {
+			http.Error(w, "Performer name not specified", http.StatusBadRequest)
+			return
+		}
+
+		// Scan for previews
+		performerFolderPath := filepath.Join(performerFoldersDir, performerName)
+		performerEntries, err := os.ReadDir(performerFolderPath)
+		if err != nil {
+			log.Printf("Failed to read performer folder %s for previews: %v", performerFolderPath, err)
+			http.Error(w, "Failed to read performer folder", http.StatusInternalServerError)
+			return
+		}
+
+		var previews []string
+		for _, pEntry := range performerEntries {
+			ext := strings.ToLower(filepath.Ext(pEntry.Name()))
+			if !pEntry.IsDir() && ext == ".mkv" {
+				relativePath, err := filepath.Rel(performerFoldersDir, filepath.Join(performerFolderPath, pEntry.Name()))
+				if err != nil {
+					log.Printf("Failed to get relative path for preview %s: %v", pEntry.Name(), err)
+					continue
+				}
+				previews = append(previews, filepath.ToSlash(relativePath))
+			}
+		}
+
+		var performerJSON string
+		err = db.QueryRow("SELECT data FROM performers WHERE name = ?", performerName).Scan(&performerJSON)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Performer not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			log.Printf("Failed to query performer %s from database: %v", performerName, err)
+			http.Error(w, "Failed to retrieve performer details", http.StatusInternalServerError)
+			return
+		}
+
+		var performer Performer
+		if err := json.Unmarshal([]byte(performerJSON), &performer); err != nil {
+			log.Printf("Failed to unmarshal performer JSON for %s: %v", performerName, err)
+			http.Error(w, "Failed to process performer data", http.StatusInternalServerError)
+			return
+		}
+
+		performer.Previews = previews
+		if performer.DefaultPreview != "" && !containsString(previews, performer.DefaultPreview) {
+			performer.DefaultPreview = ""
+		}
+
+		updatedPerformerJSON, err := json.Marshal(performer)
+		if err != nil {
+			log.Printf("Failed to marshal updated performer %s to JSON: %v", performerName, err)
+			http.Error(w, "Failed to update performer data", http.StatusInternalServerError)
+			return
+		}
+
+		_, err = db.Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), performerName)
+		if err != nil {
+			log.Printf("Failed to update performer %s in database: %v", performerName, err)
+			http.Error(w, "Failed to reset previews", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Previews reset successfully"})
 		return
 	}
 
@@ -968,7 +1105,7 @@ func autoAddPerformersFromFolders() {
 											log.Printf("Error querying existing performer %s from database: %v", pName, err)
 											return
 										} else if err == sql.ErrNoRows { // Performer does not exist, initialize with default template
-											newPerformer = defaultPerformer
+											newPerformer = newDefaultPerformer()
 											newPerformer.Name = pName // Ensure name is set
 										} else { // Performer exists, unmarshal existing data
 											if err := json.Unmarshal([]byte(existingPerformerJSON), &newPerformer); err != nil {
@@ -1156,7 +1293,7 @@ func autoAddPerformersFromFolders() {
 				var previews []string
 				for _, pEntry := range performerEntries {
 					ext := strings.ToLower(filepath.Ext(pEntry.Name()))
-					if !pEntry.IsDir() && (ext == ".mkv" || ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif") {
+					if !pEntry.IsDir() && ext == ".mkv" {
 						relativePath, err := filepath.Rel(performerFoldersDir, filepath.Join(performerFolderPath, pEntry.Name()))
 						if err != nil {
 							log.Printf("Failed to get relative path for preview %s: %v", pEntry.Name(), err)
@@ -1249,7 +1386,7 @@ func fetchPerformerMetadataHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newPerformer := defaultPerformer // Start with the default template
+	newPerformer := newDefaultPerformer() // Start with the default template
 	newPerformer.Name = performerName
 
 	// Process Aliases
@@ -1679,7 +1816,7 @@ func updatePerformerPreviewsTask() {
 			} else {
 				for _, entry := range performerEntries {
 					ext := strings.ToLower(filepath.Ext(entry.Name()))
-					if !entry.IsDir() && (ext == ".mkv" || ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".gif") {
+					if !entry.IsDir() && ext == ".mkv" {
 						relativePath, err := filepath.Rel(performerFoldersDir, filepath.Join(performerFolderPath, entry.Name()))
 						if err != nil {
 							log.Printf("Failed to get relative path for preview %s: %v", entry.Name(), err)

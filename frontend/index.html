@@ -129,21 +129,39 @@
                 </div>
                 <div class="filter-group">
                     <label>Age:</label>
-                    <input type="number" id="age-min" placeholder="Min">
-                    <span>-</span>
-                    <input type="number" id="age-max" placeholder="Max">
+                    <div class="slider-control">
+                        <label for="age-min">Min:</label>
+                        <input type="range" id="age-min">
+                        <span id="age-min-value"></span>
+                    </div>
+                    <div class="slider-control">
+                        <label for="age-max">Max:</label>
+                        <input type="range" id="age-max">
+                        <span id="age-max-value"></span>
+                    </div>
                 </div>
                 <div class="filter-group">
                     <label>Breast Size:</label>
-                    <input type="text" id="cup-min" placeholder="Min">
+                    <select id="cup-min"></select>
                     <span>-</span>
-                    <input type="text" id="cup-max" placeholder="Max">
+                    <select id="cup-max"></select>
                 </div>
                 <div class="filter-group">
                     <label>Height:</label>
-                    <input type="number" id="height-min" placeholder="Min">
-                    <span>-</span>
-                    <input type="number" id="height-max" placeholder="Max">
+                    <div class="slider-control">
+                        <label for="height-min">Min:</label>
+                        <input type="range" id="height-min">
+                        <span id="height-min-value"></span>
+                    </div>
+                    <div class="slider-control">
+                        <label for="height-max">Max:</label>
+                        <input type="range" id="height-max">
+                        <span id="height-max-value"></span>
+                    </div>
+                </div>
+                <div class="filter-group filter-buttons">
+                    <button id="apply-filters-button">Apply Filters</button>
+                    <button id="reset-filters-button">Reset Filters</button>
                 </div>
             </div>
             <div class="performers-content">
@@ -223,6 +241,8 @@
         <ul>
             <li id="set-as-default-button">Set as default</li>
             <li id="fetch-metadata-button">Fetch Metadata</li>
+            <li id="reset-metadata-button">Reset Metadata</li>
+            <li id="reset-previews-button">Reset Previews</li>
         </ul>
     </div>
 </body>

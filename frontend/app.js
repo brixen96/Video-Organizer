@@ -1,3 +1,24 @@
+
+const closeDetailsPanelAndPauseVideos = () => {
+    const performerDetailsPanel = document.getElementById('performer-details-panel');
+    const performerCarouselVideo = performerDetailsPanel ? performerDetailsPanel.querySelector('.performer-carousel video') : null;
+    if (performerDetailsPanel) {
+        performerDetailsPanel.classList.remove('active');
+        if (performerCarouselVideo) {
+            performerCarouselVideo.pause();
+            performerCarouselVideo.src = '';
+        }
+    }
+
+    const videoModal = document.getElementById('video-modal');
+    const modalVideoPlayer = document.getElementById('modal-video-player');
+    if (videoModal && modalVideoPlayer) {
+        videoModal.style.display = 'none';
+        modalVideoPlayer.pause();
+        modalVideoPlayer.src = '';
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     const videoGrid = document.getElementById('video-grid');
     const modal = document.getElementById('video-modal');
@@ -20,15 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Explicitly hide performer-details-panel if not on performers page
-        const performerDetailsPanel = document.getElementById('performer-details-panel');
-        if (pageId !== 'performers-page' && performerDetailsPanel) {
-            performerDetailsPanel.classList.remove('active');
-            // Also pause any video playing in the carousel
-            const carouselVideo = performerDetailsPanel.querySelector('.performer-carousel video');
-            if (carouselVideo) {
-                carouselVideo.pause();
-                carouselVideo.src = '';
-            }
+        if (pageId !== 'performers-page') {
+            closeDetailsPanelAndPauseVideos();
         }
 
         if (pageId === 'scenes-page') {
@@ -80,11 +94,30 @@ document.addEventListener('DOMContentLoaded', () => {
         const filterZooSelect = document.getElementById('performer-filter-zoo');
         const ageMinInput = document.getElementById('age-min');
         const ageMaxInput = document.getElementById('age-max');
-        const cupMinInput = document.getElementById('cup-min');
-        const cupMaxInput = document.getElementById('cup-max');
+        const ageMinValueSpan = document.getElementById('age-min-value');
+        const ageMaxValueSpan = document.getElementById('age-max-value');
+
         const heightMinInput = document.getElementById('height-min');
         const heightMaxInput = document.getElementById('height-max');
+        const heightMinValueSpan = document.getElementById('height-min-value');
+        const heightMaxValueSpan = document.getElementById('height-max-value');
+
+        const cupMinSelect = document.getElementById('cup-min');
+        const cupMaxSelect = document.getElementById('cup-max');
+
+        const applyFiltersButton = document.getElementById('apply-filters-button');
+        const resetFiltersButton = document.getElementById('reset-filters-button');
+
         let allPerformers = [];
+        let minAgeGlobal = 0;
+        let maxAgeGlobal = 0;
+        let minHeightGlobal = 0;
+        let maxHeightGlobal = 0;
+        let allCupSizes = [];
+
+        const closePerformerDetailsPanel = () => {
+            closeDetailsPanelAndPauseVideos();
+        };
 
         const cupSizeOrder = (cup) => {
             const order = ['AA', 'A', 'B', 'C', 'D', 'DD', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
@@ -117,13 +150,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 performerItem.innerHTML = `
                     <div class="performer-preview-container">
                         ${performer.default_preview 
-                            ? (performer.default_preview.endsWith('.mkv') 
-                                ? `<video src="/performer-previews/${performer.default_preview}" loop muted class="performer-thumbnail"></video>` 
-                                : `<img src="/performer-previews/${performer.default_preview}" alt="${performer.name}" class="performer-thumbnail">`)
+                            ? `<video src="/performer-previews/${performer.default_preview}" loop muted class="performer-thumbnail"></video>` 
                             : (performer.previews && performer.previews.length > 0 
-                                ? (performer.previews[0].endsWith('.mkv') 
-                                    ? `<video src="/performer-previews/${performer.previews[0]}" loop muted class="performer-thumbnail"></video>` 
-                                    : `<img src="/performer-previews/${performer.previews[0]}" alt="${performer.name}" class="performer-thumbnail">`)
+                                ? `<video src="/performer-previews/${performer.previews[0]}" loop muted class="performer-thumbnail"></video>` 
                                 : `<img src="https://via.placeholder.com/150" alt="${performer.name}" class="performer-thumbnail">`)
                         }
                     </div>
@@ -153,31 +182,62 @@ document.addEventListener('DOMContentLoaded', () => {
             let filteredPerformers = [...allPerformers];
 
             // Filters
-            const minAge = parseInt(ageMinInput.value) || 0;
-            const maxAge = parseInt(ageMaxInput.value) || Infinity;
-            const minCupIndex = cupSizeOrder(cupMinInput.value);
-            const maxCupIndex = cupSizeOrder(cupMaxInput.value) === -1 ? Infinity : cupSizeOrder(cupMaxInput.value);
-            const minHeight = parseInt(heightMinInput.value) || 0;
-            const maxHeight = parseInt(heightMaxInput.value) || Infinity;
+            const minAge = parseInt(ageMinInput.value);
+            const maxAge = parseInt(ageMaxInput.value);
+            const minHeight = parseInt(heightMinInput.value);
+            const maxHeight = parseInt(heightMaxInput.value);
+            const minCupIndex = cupMinSelect.value === '' ? -1 : cupSizeOrder(cupMinSelect.value);
+            const maxCupIndex = cupMaxSelect.value === '' ? Infinity : cupSizeOrder(cupMaxSelect.value);
 
             filteredPerformers = filteredPerformers.filter(p => {
-                const age = parseInt(p.age) || 0;
-                const cupIndex = cupSizeOrder(p.appearance?.cup);
-                const height = parseHeight(p.appearance?.height);
+                const performerAge = parseInt(p.age);
+                const performerHeight = parseHeight(p.appearance?.height);
+                const performerCupIndex = cupSizeOrder(p.appearance?.cup);
 
-                const ageMatch = age >= minAge && age <= maxAge;
-                const cupMatch = cupIndex >= minCupIndex && cupIndex <= maxCupIndex;
-                const heightMatch = height >= minHeight && height <= maxHeight;
+                // Age filter
+                let ageMatch = true;
+                // If the age filter is NOT set to its widest possible range (minAgeGlobal to maxAgeGlobal)
+                if (!(minAge === minAgeGlobal && maxAge === maxAgeGlobal)) {
+                    if (!isNaN(performerAge)) { // If performer has age
+                        ageMatch = performerAge >= minAge && performerAge <= maxAge;
+                    } else { // Performer has no age, so it doesn't match if a range is set
+                        ageMatch = false;
+                    }
+                }
 
-                return ageMatch && cupMatch && heightMatch;
+                // Height filter
+                let heightMatch = true;
+                // If the height filter is NOT set to its widest possible range (minHeightGlobal to maxHeightGlobal)
+                if (!(minHeight === minHeightGlobal && maxHeight === maxHeightGlobal)) {
+                    if (!isNaN(performerHeight) && performerHeight > 0) { // If performer has height
+                        heightMatch = performerHeight >= minHeight && performerHeight <= maxHeight;
+                    } else { // Performer has no height, so it doesn't match if a range is set
+                        heightMatch = false;
+                    }
+                }
+
+                // Cup filter
+                let cupMatch = true;
+                // If the cup filter is NOT set to 'All' for both min and max
+                if (cupMinSelect.value !== '' || cupMaxSelect.value !== '') {
+                    if (performerCupIndex !== -1) { // If performer has cup size
+                        cupMatch = performerCupIndex >= minCupIndex && performerCupIndex <= maxCupIndex;
+                    } else { // Performer has no cup size, so it doesn't match if a range is set
+                        cupMatch = false;
+                    }
+                }
+
+                // Zoo filter
+                const zoo = filterZooSelect.value;
+                let zooMatch = true;
+                if (zoo === 'yes') {
+                    zooMatch = p.zoo === 'true';
+                } else if (zoo === 'no') {
+                    zooMatch = p.zoo !== 'true';
+                }
+
+                return ageMatch && cupMatch && heightMatch && zooMatch;
             });
-
-            const zoo = filterZooSelect.value;
-            if (zoo === 'yes') {
-                filteredPerformers = filteredPerformers.filter(p => p.zoo && p.zoo !== 'undefined');
-            } else if (zoo === 'no') {
-                filteredPerformers = filteredPerformers.filter(p => !p.zoo || p.zoo === 'undefined');
-            }
 
             // Sort
             const sortBy = sortBySelect.value;
@@ -204,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     filteredPerformers.sort((a, b) => parseHeight(b.appearance?.height) - parseHeight(a.appearance?.height));
                     break;
                 case 'height-asc':
-                    filteredPerformers.sort((a, b) => parseHeight(a.appearance?.height) - parseHeight(b.appearance?.height));
+                    filteredPerformers.sort((a, b) => parseHeight(a.appearance?.height) - parseHeight(a.appearance?.height));
                     break;
                 case 'rating-desc':
                     filteredPerformers.sort((a, b) => (b.rating || 0) - (a.rating || 0));
@@ -223,35 +283,129 @@ document.addEventListener('DOMContentLoaded', () => {
             renderPerformers(filteredPerformers);
         };
 
+        const resetFilters = () => {
+            // Reset Age sliders
+            ageMinInput.value = minAgeGlobal;
+            ageMinValueSpan.textContent = minAgeGlobal;
+            ageMaxInput.value = maxAgeGlobal;
+            ageMaxValueSpan.textContent = maxAgeGlobal;
+
+            // Reset Height sliders
+            heightMinInput.value = minHeightGlobal;
+            heightMinValueSpan.textContent = minHeightGlobal;
+            heightMaxInput.value = maxHeightGlobal;
+            heightMaxValueSpan.textContent = maxHeightGlobal;
+
+            // Reset Cup size dropdowns
+            cupMinSelect.value = '';
+            cupMaxSelect.value = '';
+
+            // Reset Zoo filter
+            filterZooSelect.value = 'all';
+
+            // Reset Sort By
+            sortBySelect.value = 'name-asc';
+
+            applyFiltersAndSort(); // Apply filters after reset
+        };
+
         fetch('/api/performers')
             .then(response => response.json())
             .then(performers => {
                 allPerformers = performers;
 
-                // Set placeholders for range filters
+                // Initialize global min/max values for sliders
                 const ages = performers.map(p => parseInt(p.age)).filter(age => !isNaN(age));
-                ageMinInput.placeholder = Math.min(...ages);
-                ageMaxInput.placeholder = Math.max(...ages);
+                minAgeGlobal = Math.min(...ages);
+                maxAgeGlobal = Math.max(...ages);
 
                 const heights = performers.map(p => parseHeight(p.appearance?.height)).filter(h => h > 0);
-                heightMinInput.placeholder = Math.min(...heights);
-                heightMaxInput.placeholder = Math.max(...heights);
+                minHeightGlobal = Math.min(...heights);
+                maxHeightGlobal = Math.max(...heights);
 
-                applyFiltersAndSort();
+                allCupSizes = [...new Set(performers.map(p => p.appearance?.cup).filter(cup => cup && cupSizeOrder(cup) !== -1))];
+                allCupSizes.sort((a, b) => cupSizeOrder(a) - cupSizeOrder(b));
+
+                // Set min/max for age and height sliders
+                ageMinInput.min = minAgeGlobal;
+                ageMinInput.max = maxAgeGlobal;
+                ageMaxInput.min = minAgeGlobal;
+                ageMaxInput.max = maxAgeGlobal;
+
+                heightMinInput.min = minHeightGlobal;
+                heightMinInput.max = maxHeightGlobal;
+                heightMaxInput.min = minHeightGlobal;
+                heightMaxInput.max = maxHeightGlobal;
+
+                // Populate cup size dropdowns
+                const populateCupDropdown = (selectElement) => {
+                    selectElement.innerHTML = '<option value="">All</option>';
+                    allCupSizes.forEach(cup => {
+                        const option = document.createElement('option');
+                        option.value = cup;
+                        option.textContent = cup;
+                        selectElement.appendChild(option);
+                    });
+                };
+
+                populateCupDropdown(cupMinSelect);
+                populateCupDropdown(cupMaxSelect);
+
+                // Set initial slider values and text
+                ageMinInput.value = minAgeGlobal;
+                ageMinValueSpan.textContent = minAgeGlobal;
+                ageMaxInput.value = maxAgeGlobal;
+                ageMaxValueSpan.textContent = maxAgeGlobal;
+
+                heightMinInput.value = minHeightGlobal;
+                heightMinValueSpan.textContent = minHeightGlobal;
+                heightMaxInput.value = maxHeightGlobal;
+                heightMaxValueSpan.textContent = maxHeightGlobal;
+
+                resetFilters(); // Initialize filters to default and display all performers
             })
             .catch(error => {
                 console.error('Error fetching performers:', error);
                 performerWall.textContent = 'Failed to load performers.';
             });
 
+        // Event Listeners for filters and sort (no immediate apply)
+        ageMinInput.addEventListener('input', () => {
+            ageMinValueSpan.textContent = ageMinInput.value;
+            if (parseInt(ageMinInput.value) > parseInt(ageMaxInput.value)) {
+                ageMaxInput.value = ageMinInput.value;
+                ageMaxValueSpan.textContent = ageMinInput.value;
+            }
+        });
+        ageMaxInput.addEventListener('input', () => {
+            ageMaxValueSpan.textContent = ageMaxInput.value;
+            if (parseInt(ageMaxInput.value) < parseInt(ageMinInput.value)) {
+                ageMinInput.value = ageMaxInput.value;
+                ageMinValueSpan.textContent = ageMaxInput.value;
+            }
+        });
+        heightMinInput.addEventListener('input', () => {
+            heightMinValueSpan.textContent = heightMinInput.value;
+            if (parseInt(heightMinInput.value) > parseInt(heightMaxInput.value)) {
+                heightMaxInput.value = heightMinInput.value;
+                heightMaxValueSpan.textContent = heightMinInput.value;
+            }
+        });
+        heightMaxInput.addEventListener('input', () => {
+            heightMaxValueSpan.textContent = heightMaxInput.value;
+            if (parseInt(heightMaxInput.value) < parseInt(heightMinInput.value)) {
+                heightMinInput.value = heightMaxInput.value;
+                heightMinValueSpan.textContent = heightMaxInput.value;
+            }
+        });
+
+        // Event listeners for buttons
+        applyFiltersButton.addEventListener('click', applyFiltersAndSort);
+        resetFiltersButton.addEventListener('click', resetFilters);
+
+        // Initial render is handled by resetFilters() after data fetch
         sortBySelect.addEventListener('change', applyFiltersAndSort);
         filterZooSelect.addEventListener('change', applyFiltersAndSort);
-        ageMinInput.addEventListener('input', applyFiltersAndSort);
-        ageMaxInput.addEventListener('input', applyFiltersAndSort);
-        cupMinInput.addEventListener('input', applyFiltersAndSort);
-        cupMaxInput.addEventListener('input', applyFiltersAndSort);
-        heightMinInput.addEventListener('input', applyFiltersAndSort);
-        heightMaxInput.addEventListener('input', applyFiltersAndSort);
     };
 
     const displayPerformerDetails = (performerName) => {
@@ -276,13 +430,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Close button for details panel
         closeDetailsButton.onclick = () => {
-            performerDetailsPanel.classList.remove('active');
-            // Pause any playing videos in the carousel when closing
-            const carouselVideo = performerCarousel.querySelector('video');
-            if (carouselVideo) {
-                carouselVideo.pause();
-                carouselVideo.src = '';
-            }
+            closeDetailsPanelAndPauseVideos();
         };
 
         // Handle tabs within the details panel
@@ -319,20 +467,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Function to render a preview in the main display
                     const renderMainPreview = (previewUrl) => {
                         mainPreviewContainer.innerHTML = ''; // Clear previous main preview
-                        const isVideo = previewUrl.endsWith('.mkv');
-                        if (isVideo) {
-                            const video = document.createElement('video');
-                            video.src = `/performer-previews/${previewUrl}`;
-                            video.controls = true;
-                            video.autoplay = true; // Autoplay the main focused video
-                            video.loop = true;
-                            video.muted = true;
-                            mainPreviewContainer.appendChild(video);
-                        } else {
-                            const img = document.createElement('img');
-                            img.src = `/performer-previews/${previewUrl}`;
-                            mainPreviewContainer.appendChild(img);
-                        }
+                        const video = document.createElement('video');
+                        video.src = `/performer-previews/${previewUrl}`;
+                        video.controls = true;
+                        video.autoplay = true; // Autoplay the main focused video
+                        video.loop = true;
+                        video.muted = true;
+                        mainPreviewContainer.appendChild(video);
                     };
 
                     // Render the first preview initially
@@ -347,19 +488,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             thumbItem.classList.add('active');
                         }
 
-                        const isVideo = previewUrl.endsWith('.mkv');
-                        if (isVideo) {
-                            const video = document.createElement('video');
-                            video.src = `/performer-previews/${previewUrl}`;
-                            video.muted = true;
-                            thumbItem.appendChild(video);
-                            thumbItem.addEventListener('mouseenter', () => { video.play(); });
-                            thumbItem.addEventListener('mouseleave', () => { video.pause(); video.currentTime = 0; });
-                        } else {
-                            const img = document.createElement('img');
-                            img.src = `/performer-previews/${previewUrl}`;
-                            thumbItem.appendChild(img);
-                        }
+                        const video = document.createElement('video');
+                        video.src = `/performer-previews/${previewUrl}`;
+                        video.muted = true;
+                        thumbItem.appendChild(video);
+                        thumbItem.addEventListener('mouseenter', () => { video.play(); });
+                        thumbItem.addEventListener('mouseleave', () => { video.pause(); video.currentTime = 0; });
+                        
                         thumbItem.addEventListener('click', () => {
                             renderMainPreview(previewUrl);
                         });
@@ -416,6 +551,50 @@ document.addEventListener('DOMContentLoaded', () => {
                                 } catch (error) {
                                     console.error('Error fetching metadata:', error);
                                     alert('Failed to fetch metadata.');
+                                }
+                                contextMenu.style.display = 'none';
+                            };
+
+                            const resetMetadataButton = document.getElementById('reset-metadata-button');
+                            resetMetadataButton.onclick = async () => {
+                                if (confirm(`Are you sure you want to reset all metadata for ${performer.name}? This cannot be undone.`)) {
+                                    try {
+                                        const response = await fetch(`/api/performers/${performer.name}/reset-metadata`, {
+                                            method: 'POST',
+                                        });
+                                        if (!response.ok) {
+                                            throw new Error(`HTTP error! status: ${response.status}`);
+                                        }
+                                        const result = await response.json();
+                                        console.log(result.message);
+                                        alert(result.message);
+                                        // Refresh performer details after resetting metadata
+                                        displayPerformerDetails(performer.name);
+                                    } catch (error) {
+                                        console.error('Error resetting metadata:', error);
+                                        alert('Failed to reset metadata.');
+                                    }
+                                }
+                                contextMenu.style.display = 'none';
+                            };
+
+                            const resetPreviewsButton = document.getElementById('reset-previews-button');
+                            resetPreviewsButton.onclick = async () => {
+                                try {
+                                    const response = await fetch(`/api/performers/${performer.name}/reset-previews`, {
+                                        method: 'POST',
+                                    });
+                                    if (!response.ok) {
+                                        throw new Error(`HTTP error! status: ${response.status}`);
+                                    }
+                                    const result = await response.json();
+                                    console.log(result.message);
+                                    alert(result.message);
+                                    // Refresh performer details after resetting previews
+                                    displayPerformerDetails(performer.name);
+                                } catch (error) {
+                                    console.error('Error resetting previews:', error);
+                                    alert('Failed to reset previews.');
                                 }
                                 contextMenu.style.display = 'none';
                             };
@@ -566,9 +745,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                performer.zoo = newZooStatus.toString(); // Update local performer object
-                zooToggle.classList.toggle('active'); // Update UI
-            } catch (error) {
+                                    performer.zoo = newZooStatus.toString(); // Update local performer object
+                                    zooToggle.classList.toggle('active'); // Update UI
+                
+                                    // Find the performer in allPerformers and update their zoo status
+                                    const performerInAllPerformers = allPerformers.find(p => p.name === performer.name);
+                                    if (performerInAllPerformers) {
+                                        performerInAllPerformers.zoo = newZooStatus.toString();
+                                    }            } catch (error) {
                 console.error('Error updating zoo status:', error);
                 alert('Failed to update zoo status.');
             }
@@ -884,17 +1068,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     closeButton.addEventListener('click', () => {
-        modal.style.display = 'none';
-        modalVideoPlayer.pause();
-        modalVideoPlayer.src = '';
-        currentVideo = null;
+        closeDetailsPanelAndPauseVideos();
     });
     window.addEventListener('click', (event) => {
         if (event.target == modal) {
-            modal.style.display = 'none';
-            modalVideoPlayer.pause();
-            modalVideoPlayer.src = '';
-            currentVideo = null;
+            closeDetailsPanelAndPauseVideos();
         }
     });
 
@@ -1060,4 +1238,27 @@ document.addEventListener('DOMContentLoaded', () => {
             sendMessage();
         }
     });
+
+    // Close details panel when clicking on the navbar
+    const navbar = document.querySelector('.navbar');
+    if (navbar) {
+        navbar.addEventListener('click', (event) => {
+            // Prevent closing if a navbar link is clicked (which would navigate)
+            if (event.target.tagName === 'A') {
+                return;
+            }
+            closeDetailsPanelAndPauseVideos();
+        });
+    }
+
+    // Close details panel when clicking on empty space in performer-wall
+    const performerWall = document.getElementById('performer-wall');
+    if (performerWall) {
+        performerWall.addEventListener('click', (event) => {
+            // Only close if the click target is the performer-wall itself, not a child element
+            if (event.target === performerWall) {
+                closeDetailsPanelAndPauseVideos();
+            }
+        });
+    }
 });
