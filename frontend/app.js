@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentVideo = null;
     let allVideos = []; // Global variable to store all video data
+    let allPerformers = []; // Global variable to store all performer data
 
     const handlePageVisibility = (pageId) => {
         const pages = document.querySelectorAll('.page');
@@ -108,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const applyFiltersButton = document.getElementById('apply-filters-button');
         const resetFiltersButton = document.getElementById('reset-filters-button');
 
-        let allPerformers = [];
+
         let minAgeGlobal = 0;
         let maxAgeGlobal = 0;
         let minHeightGlobal = 0;
@@ -745,6 +746,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
+                const result = await response.json();
+                console.log(result.message);
+                // Optionally, display a success message to the user
+                // alert(result.message);
+
                                     performer.zoo = newZooStatus.toString(); // Update local performer object
                                     zooToggle.classList.toggle('active'); // Update UI
                 

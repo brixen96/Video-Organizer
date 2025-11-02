@@ -1,14 +1,23 @@
-2025/11/02 21:58:54 main.go:220: Database initialized and performers table ensured.
-2025/11/02 21:58:54 main.go:224: Updating existing performer schema in database...
-2025/11/02 21:58:54 main.go:272: Performer schema update completed.
-2025/11/02 21:58:54 main.go:1062: Checking for new performers in folders...
-2025/11/02 21:58:54 main.go:1096: New performer folder found: Mommabear. Processing concurrently.
-2025/11/02 21:58:55 main.go:1127: Failed to fetch data for performer Mommabear from Adultdatalink API: Adultdatalink API returned non-OK status for Mommabear: 404 Not Found
-2025/11/02 21:58:55 main.go:1306: Found 4 previews for Mommabear.
-2025/11/02 21:58:55 main.go:1322: Batch inserting 1 new performers into database.
-2025/11/02 21:58:55 main.go:1353: Batch insert of new performers completed.
-2025/11/02 21:58:55 main.go:1356: Finished checking for new performers.
-2025/11/02 21:58:55 main.go:908: Initializing video cache...
-2025/11/02 21:58:58 main.go:932: Video cache initialized with 67 videos.
-2025/11/02 21:58:58 main.go:1056: Performer scene counts updated.
-2025/11/02 21:58:58 main.go:1891: Application starting...
+2025/11/03 00:23:32 main.go:221: Database initialized and performers table ensured.
+2025/11/03 00:23:32 main.go:225: Updating existing performer schema in database...
+2025/11/03 00:23:32 main.go:274: Performer schema update completed.
+2025/11/03 00:23:32 main.go:1095: Checking for new performers in folders...
+2025/11/03 00:23:32 main.go:1129: New performer folder found: Lola Chanel. Processing concurrently.
+2025/11/03 00:23:32 main.go:1129: New performer folder found: Lilijunex. Processing concurrently.
+2025/11/03 00:23:42 main.go:1150: Failed to fetch data for performer Lilijunex from Adultdatalink API: Adultdatalink API returned non-OK status for Lilijunex: 404 Not Found
+2025/11/03 00:23:42 main.go:1180: Found 2 previews for Lilijunex.
+2025/11/03 00:23:43 main.go:1157: Successfully fetched Adultdatalink API data for Lola Chanel.
+2025/11/03 00:23:43 main.go:1180: Found 2 previews for Lola Chanel.
+2025/11/03 00:23:43 main.go:1195: Batch inserting 2 new performers into database.
+2025/11/03 00:23:43 main.go:1226: Batch insert of new performers completed.
+2025/11/03 00:23:43 main.go:1229: Finished checking for new performers.
+2025/11/03 00:23:43 main.go:941: Initializing video cache...
+2025/11/03 00:23:47 main.go:965: Video cache initialized with 67 videos.
+2025/11/03 00:23:47 main.go:1089: Performer scene counts updated.
+2025/11/03 00:23:47 main.go:1565: Application starting...
+2025/11/03 00:24:11 main.go:533: DEBUG: Successfully updated zoo status for Zaina in database.
+2025/11/03 00:24:13 main.go:533: DEBUG: Successfully updated zoo status for Zaina in database.
+2025/11/03 00:24:14 main.go:533: DEBUG: Successfully updated zoo status for Zaina in database.
+2025/11/03 00:24:14 main.go:533: DEBUG: Successfully updated zoo status for Zaina in database.
+2025/11/03 00:24:15 main.go:533: DEBUG: Successfully updated zoo status for Zaina in database.
+2025/11/03 00:24:16 main.go:533: DEBUG: Successfully updated zoo status for Zaina in database.

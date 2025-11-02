@@ -192,7 +192,8 @@ func setupLogging() {
 func videosHandler(w http.ResponseWriter, r *http.Request) {
 	var videos []VideoInfo
 	for _, video := range videoCache {
-		videos = append(videos, video)
+	
+videos = append(videos, video)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -222,7 +223,8 @@ func initDB() {
 
 func updateExistingPerformersSchema() {
 	log.Println("Updating existing performer schema in database...")
-	rows, err := db.Query("SELECT name, data FROM performers")
+
+rows, err := db.Query("SELECT name, data FROM performers")
 	if err != nil {
 		log.Printf("Failed to query existing performers for schema update: %v", err)
 		return
@@ -238,7 +240,7 @@ func updateExistingPerformersSchema() {
 			continue
 		}
 
-		var oldPerformerMap map[string]interface{}
+		var oldPerformerMap map[string]interface{ } 
 		if err := json.Unmarshal([]byte(oldJSON), &oldPerformerMap); err != nil {
 			log.Printf("Failed to unmarshal old performer JSON for %s: %v", name, err)
 			continue
@@ -381,7 +383,8 @@ func performersHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"message": "Performer added successfully"})
 
 	case http.MethodGet:
-		rows, err := db.Query("SELECT data FROM performers")
+	
+rows, err := db.Query("SELECT data FROM performers")
 		if err != nil {
 			log.Println("Failed to query performers from database:", err)
 			http.Error(w, "Failed to retrieve performers", http.StatusInternalServerError)
@@ -523,11 +526,11 @@ func performerDetailsHandler(w http.ResponseWriter, r *http.Request) {
 
 		_, err = db.Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), performerName)
 		if err != nil {
-			log.Printf("Failed to update performer %s in database: %v", performerName, err)
+			log.Printf("ERROR: Failed to update performer %s in database for set-zoo: %v", performerName, err)
 			http.Error(w, "Failed to save zoo status", http.StatusInternalServerError)
 			return
 		}
-
+		log.Printf("DEBUG: Successfully updated zoo status for %s in database.", performerName)
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Zoo status updated successfully"})
 		return
@@ -668,6 +671,92 @@ func performerDetailsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Handle fetch-metadata action
+	if strings.HasSuffix(performerName, "/fetch-metadata") {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		trimmedPerformerName := strings.TrimSuffix(performerName, "/fetch-metadata")
+		if trimmedPerformerName == "" {
+			http.Error(w, "Performer name not specified", http.StatusBadRequest)
+			return
+		}
+
+		log.Printf("Fetching metadata for performer: %s", trimmedPerformerName)
+
+		// Fetch performer data from Adultdatalink API
+		performerDataBytes, err := fetchPerformerData(trimmedPerformerName)
+		if err != nil {
+			log.Printf("Failed to fetch data for performer %s from Adultdatalink API: %v", trimmedPerformerName, err)
+			http.Error(w, fmt.Sprintf("Failed to fetch metadata: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		var rawAPIResponse map[string]interface{} 
+		if err := json.Unmarshal(performerDataBytes, &rawAPIResponse); err != nil {
+			log.Printf("Failed to unmarshal raw Adultdatalink API response for %s: %v", trimmedPerformerName, err)
+			http.Error(w, "Failed to process API response", http.StatusInternalServerError)
+			return
+		}
+
+		var performer Performer
+		var existingPerformerJSON string
+		err = db.QueryRow("SELECT data FROM performers WHERE name = ?", trimmedPerformerName).Scan(&existingPerformerJSON)
+		if err == sql.ErrNoRows {
+			// Performer not found in DB, create a new one
+			performer = newDefaultPerformer()
+			performer.Name = trimmedPerformerName
+			populatePerformerFromAPIResponse(&performer, rawAPIResponse)
+			
+			performerJSON, err := json.Marshal(performer)
+			if err != nil {
+				log.Printf("Failed to marshal new performer %s to JSON: %v", trimmedPerformerName, err)
+				http.Error(w, "Failed to process performer data", http.StatusInternalServerError)
+				return
+			}
+			_, err = db.Exec("INSERT INTO performers(name, data) VALUES(?, ?)", trimmedPerformerName, string(performerJSON))
+			if err != nil {
+				log.Printf("Failed to insert new performer %s into database: %v", trimmedPerformerName, err)
+				http.Error(w, "Failed to add performer", http.StatusInternalServerError)
+				return
+			}
+			log.Printf("Successfully fetched metadata and added new performer %s.", trimmedPerformerName)
+
+		} else if err != nil {
+			log.Printf("Failed to query performer %s from database: %v", trimmedPerformerName, err)
+			http.Error(w, "Failed to retrieve performer details", http.StatusInternalServerError)
+			return
+		} else {
+			// Performer found, unmarshal existing data and update
+			if err := json.Unmarshal([]byte(existingPerformerJSON), &performer); err != nil {
+				log.Printf("Failed to unmarshal existing performer JSON for %s: %v", trimmedPerformerName, err)
+				http.Error(w, "Failed to process performer data", http.StatusInternalServerError)
+				return
+			}
+			populatePerformerFromAPIResponse(&performer, rawAPIResponse)
+
+			updatedPerformerJSON, err := json.Marshal(performer)
+			if err != nil {
+				log.Printf("Failed to marshal updated performer %s to JSON: %v", trimmedPerformerName, err)
+				http.Error(w, "Failed to process performer data", http.StatusInternalServerError)
+				return
+			}
+
+			_, err = db.Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), trimmedPerformerName)
+			if err != nil {
+				log.Printf("Failed to update performer %s in database: %v", trimmedPerformerName, err)
+				http.Error(w, "Failed to update performer data in database", http.StatusInternalServerError)
+				return
+			}
+			log.Printf("Successfully fetched and updated metadata for %s.", trimmedPerformerName)
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Metadata fetched and updated successfully"})
+		return
+	}
+
 	// Existing logic for GET performer details
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -703,64 +792,7 @@ func performerDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(performer)
 }
 
-func setDefaultPreviewHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
 
-	performerName := strings.TrimPrefix(r.URL.Path, "/api/performers/")
-	performerName = strings.TrimSuffix(performerName, "/set-default-preview")
-	if performerName == "" {
-		http.Error(w, "Performer name not specified", http.StatusBadRequest)
-		return
-	}
-
-	var payload struct {
-		PreviewURL string `json:"previewUrl"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return	
-	}
-
-	var performerJSON string
-	err := db.QueryRow("SELECT data FROM performers WHERE name = ?", performerName).Scan(&performerJSON)
-	if err == sql.ErrNoRows {
-		http.Error(w, "Performer not found", http.StatusNotFound)
-		return
-	} else if err != nil {
-		log.Printf("Failed to query performer %s from database: %v", performerName, err)
-		http.Error(w, "Failed to retrieve performer details", http.StatusInternalServerError)
-		return
-	}
-
-	var performer Performer
-	if err := json.Unmarshal([]byte(performerJSON), &performer); err != nil {
-		log.Printf("Failed to unmarshal performer JSON for %s: %v", performerName, err)
-		http.Error(w, "Failed to process performer data", http.StatusInternalServerError)
-		return
-	}
-
-	performer.DefaultPreview = payload.PreviewURL
-
-	updatedPerformerJSON, err := json.Marshal(performer)
-	if err != nil {
-		log.Printf("Failed to marshal updated performer %s to JSON: %v", performerName, err)
-		http.Error(w, "Failed to update performer data", http.StatusInternalServerError)
-		return
-	}
-
-	_, err = db.Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), performerName)
-	if err != nil {
-		log.Printf("Failed to update performer %s in database: %v", performerName, err)
-		http.Error(w, "Failed to save default preview", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Default preview updated successfully"})
-}
 
 func updatePerformerPreviewsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -856,7 +888,8 @@ func performerPreviewHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getAllPerformerNames() ([]string, error) {
-	rows, err := db.Query("SELECT name FROM performers")
+
+rows, err := db.Query("SELECT name FROM performers")
 	if err != nil {
 		return nil, fmt.Errorf("failed to query performer names: %w", err)
 	}
@@ -1027,7 +1060,7 @@ func generateVideoInfo(fileName, videoPath string, performerNames []string) Vide
 
 				}
 
-		
+			
 
 				performer.SceneCount = count
 
@@ -1041,7 +1074,7 @@ func generateVideoInfo(fileName, videoPath string, performerNames []string) Vide
 
 				}
 
-		
+			
 
 				_, err = db.Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), pName)
 
@@ -1090,224 +1123,64 @@ func autoAddPerformersFromFolders() {
 		}
 
 		wg.Add(1)
-		go func(pName string) {
-			defer wg.Done()
-
-			log.Printf("New performer folder found: %s. Processing concurrently.", pName)
-
-					                    newPerformer := Performer{} // Start with an empty Performer struct
-										newPerformer.Name = pName        // Set the name
-					
-										// Check if performer already exists in DB and load their data
-										var existingPerformerJSON string
-										err := db.QueryRow("SELECT data FROM performers WHERE name = ?", pName).Scan(&existingPerformerJSON)
-										if err != nil && err != sql.ErrNoRows {
-											log.Printf("Error querying existing performer %s from database: %v", pName, err)
-											return
-										} else if err == sql.ErrNoRows { // Performer does not exist, initialize with default template
-											newPerformer = newDefaultPerformer()
-											newPerformer.Name = pName // Ensure name is set
-										} else { // Performer exists, unmarshal existing data
-											if err := json.Unmarshal([]byte(existingPerformerJSON), &newPerformer); err != nil {
-												log.Printf("Error unmarshaling existing performer %s data: %v", pName, err)
-												return
-											}
-										}
-					
-										// Ensure scene count and previews are initialized if not loaded from DB
-										if newPerformer.SceneCount == 0 {
-											newPerformer.SceneCount = 0
-										}
-										if newPerformer.Previews == nil {
-											newPerformer.Previews = []string{}
-										}
+				go func(pName string) {
+					defer wg.Done()
+		
+					log.Printf("New performer folder found: %s. Processing concurrently.", pName)
+		
+					var performer Performer
+					var existingPerformerJSON string
+					err := db.QueryRow("SELECT data FROM performers WHERE name = ?", pName).Scan(&existingPerformerJSON)
+					if err != nil && err != sql.ErrNoRows {
+						log.Printf("Error querying existing performer %s from database: %v", pName, err)
+						return
+					} else if err == sql.ErrNoRows { // Performer does not exist, initialize with default template
+						performer = newDefaultPerformer()
+						performer.Name = pName // Ensure name is set
+					} else { // Performer exists, unmarshal existing data
+						if err := json.Unmarshal([]byte(existingPerformerJSON), &performer); err != nil {
+							log.Printf("Error unmarshaling existing performer %s data: %v", pName, err)
+							return
+						}
+					}
+								
 					// Fetch performer data from Adultdatalink API
 					performerDataBytes, err := fetchPerformerData(pName)
 					if err != nil {
 						log.Printf("Failed to fetch data for performer %s from Adultdatalink API: %v", pName, err)
 					} else {
-						var rawAPIResponse map[string]interface{}
+						var rawAPIResponse map[string]interface{} 
 						if err := json.Unmarshal(performerDataBytes, &rawAPIResponse); err != nil {
 							log.Printf("Failed to unmarshal raw Adultdatalink API response for %s: %v", pName, err)
 						} else {
-							// Process Aliases
-							if aliases, ok := rawAPIResponse["aliases"]; ok {
-								if aliasesList, ok := aliases.([]interface{}); ok {
-									var tempAliases []string
-									for _, alias := range aliasesList {
-										if aliasMap, ok := alias.(map[string]interface{}); ok {
-											for k := range aliasMap {
-												tempAliases = append(tempAliases, k)
-											}
-										} else if aliasStr, ok := alias.(string); ok {
-											tempAliases = append(tempAliases, aliasStr)
-										}
-									}
-									newPerformer.Aliases = tempAliases
-								} else if aliasStr, ok := aliases.(string); ok {
-									newPerformer.Aliases = []string{aliasStr}
-								}
-							}
-
-							// Process Tags
-							if tags, ok := rawAPIResponse["tags"]; ok {
-								if tagsList, ok := tags.([]interface{}); ok {
-									var tempTags []string
-									for _, tag := range tagsList {
-										if tagMap, ok := tag.(map[string]interface{}); ok {
-											for k := range tagMap {
-												tempTags = append(tempTags, k)
-											}
-										} else if tagStr, ok := tag.(string); ok {
-											tempTags = append(tempTags, tagStr)
-										}
-									}
-									newPerformer.Tags = tempTags
-								} else if tagStr, ok := tags.(string); ok {
-									newPerformer.Tags = []string{tagStr}
-								}
-							}
-
-							// Populate other fields from rawAPIResponse only if they exist
-							if imageURL, ok := rawAPIResponse["image_url"].(string); ok && imageURL != "" {
-								newPerformer.ImageURL = imageURL
-							}
-							if appearance, ok := rawAPIResponse["appearance"].(map[string]interface{}); ok && len(appearance) > 0 {
-								newPerformer.Appearance = appearance
-							}
-							if performances, ok := rawAPIResponse["performances"].(map[string]interface{}); ok && len(performances) > 0 {
-								newPerformer.Performances = performances
-							}
-							if socialMedia, ok := rawAPIResponse["social_media"].(map[string]interface{}); ok && len(socialMedia) > 0 {
-								newPerformer.SocialMedia = socialMedia
-							}
-							if platformViews, ok := rawAPIResponse["platform_views"].(map[string]interface{}); ok && len(platformViews) > 0 {
-								newPerformer.PlatformViews = platformViews
-							}
-							if platformVideoCounts, ok := rawAPIResponse["platform_video_counts"].(map[string]interface{}); ok && len(platformVideoCounts) > 0 {
-								newPerformer.PlatformVideoCounts = platformVideoCounts
-							}
-							if platformProfileCounts, ok := rawAPIResponse["platform_profile_counts"].(map[string]interface{}); ok && len(platformProfileCounts) > 0 {
-								newPerformer.PlatformProfileCounts = platformProfileCounts
-							}
-							if externalLinks, ok := rawAPIResponse["external_links"].([]interface{}); ok && len(externalLinks) > 0 {
-								// Convert []interface{} to []map[string]string
-								var convertedLinks []map[string]string
-								for _, link := range externalLinks {
-									if linkMap, isMap := link.(map[string]interface{}); isMap {
-										convertedLink := make(map[string]string)
-										for k, v := range linkMap {
-											if strVal, isString := v.(string); isString {
-												convertedLink[k] = strVal
-											}
-										}
-										convertedLinks = append(convertedLinks, convertedLink)
-									}
-								}
-								newPerformer.ExternalLinks = convertedLinks
-							}
-															if bios, ok := rawAPIResponse["bios"]; ok {
-																if biosMap, isMap := bios.(map[string]interface{}); isMap {
-																	convertedBios := make(map[string]string)
-																	for k, v := range biosMap {
-																		if strVal, isString := v.(string); isString {
-																			convertedBios[k] = strVal
-																		}
-																	}
-																	newPerformer.Bios = convertedBios
-																}
-															};							if officialWebsite, ok := rawAPIResponse["official_website"].(string); ok && officialWebsite != "" {
-								newPerformer.OfficialWebsite = officialWebsite
-							}
-							if featureDancer, ok := rawAPIResponse["feature_dancer"].(string); ok && featureDancer != "" {
-								newPerformer.FeatureDancer = featureDancer
-							}
-							if dateOfBirth, ok := rawAPIResponse["date_of_birth"].(string); ok && dateOfBirth != "" {
-								newPerformer.DateOfBirth = dateOfBirth
-							}
-							if age, ok := rawAPIResponse["age"].(string); ok && age != "" {
-								newPerformer.Age = age
-							}
-							if sexualOrientation, ok := rawAPIResponse["sexual_orientation"].(string); ok && sexualOrientation != "" {
-								newPerformer.SexualOrientation = sexualOrientation
-							}
-							if astrologicalSign, ok := rawAPIResponse["astrological_sign"].(string); ok && astrologicalSign != "" {
-								newPerformer.AstrologicalSign = astrologicalSign
-							}
-							if profession, ok := rawAPIResponse["profession"].(string); ok && profession != "" {
-								newPerformer.Profession = profession
-							}
-							if careerStatus, ok := rawAPIResponse["career_status"].(string); ok && careerStatus != "" {
-								newPerformer.CareerStatus = careerStatus
-							}
-							if careerStart, ok := rawAPIResponse["career_start"].(string); ok && careerStart != "" {
-								newPerformer.CareerStart = careerStart
-							}
-							if careerEnd, ok := rawAPIResponse["career_end"].(string); ok && careerEnd != "" {
-								newPerformer.CareerEnd = careerEnd
-							}
-							if dateOfDeath, ok := rawAPIResponse["date_of_death"].(string); ok && dateOfDeath != "" {
-								newPerformer.DateOfDeath = dateOfDeath
-							}
-							if placeOfBirth, ok := rawAPIResponse["place_of_birth"].(string); ok && placeOfBirth != "" {
-								newPerformer.PlaceOfBirth = placeOfBirth
-							}
-							if nationality, ok := rawAPIResponse["nationality"].(string); ok && nationality != "" {
-								newPerformer.Nationality = nationality
-							}
-							if rank, ok := rawAPIResponse["rank"].(string); ok && rank != "" {
-								newPerformer.Rank = rank
-							}
-							if country, ok := rawAPIResponse["country"].(string); ok && country != "" {
-								newPerformer.Country = country
-							}
-							if avatar, ok := rawAPIResponse["avatar"].(string); ok && avatar != "" {
-								newPerformer.Avatar = avatar
-							}
-							if subscribers, ok := rawAPIResponse["subscribers"].(float64); ok {
-								newPerformer.Subscribers = int(subscribers)
-							}
-							if rating, ok := rawAPIResponse["rating"].(float64); ok {
-								newPerformer.Rating = int(rating)
-							}
-							if totalViews, ok := rawAPIResponse["total_views"].(float64); ok {
-								newPerformer.TotalViews = int(totalViews)
-							}
-							if totalVideoCount, ok := rawAPIResponse["total_video_count"].(float64); ok {
-								newPerformer.TotalVideoCount = int(totalVideoCount)
-							}
-							if totalPlatformHits, ok := rawAPIResponse["total_platform_hits"].(float64); ok {
-								newPerformer.TotalPlatformHits = int(totalPlatformHits)
-							}
-
+							populatePerformerFromAPIResponse(&performer, rawAPIResponse)
 							log.Printf("Successfully fetched Adultdatalink API data for %s.", pName)
 						}
 					}
-
-			// Scan for previews (.mkv and image files)
-			performerFolderPath := filepath.Join(performerFoldersDir, pName)
-			performerEntries, err := os.ReadDir(performerFolderPath)
-			if err != nil {
-				log.Printf("Failed to read performer folder %s for previews: %v", performerFolderPath, err)
-			} else {
-				var previews []string
-				for _, pEntry := range performerEntries {
-					ext := strings.ToLower(filepath.Ext(pEntry.Name()))
-					if !pEntry.IsDir() && ext == ".mkv" {
-						relativePath, err := filepath.Rel(performerFoldersDir, filepath.Join(performerFolderPath, pEntry.Name()))
-						if err != nil {
-							log.Printf("Failed to get relative path for preview %s: %v", pEntry.Name(), err)
-							continue
+		
+					// Scan for previews (.mkv and image files)
+					performerFolderPath := filepath.Join(performerFoldersDir, pName)
+					performerEntries, err := os.ReadDir(performerFolderPath)
+					if err != nil {
+						log.Printf("Failed to read performer folder %s for previews: %v", performerFolderPath, err)
+					} else {
+						var previews []string
+						for _, pEntry := range performerEntries {
+							ext := strings.ToLower(filepath.Ext(pEntry.Name()))
+							if !pEntry.IsDir() && ext == ".mkv" {
+								relativePath, err := filepath.Rel(performerFoldersDir, filepath.Join(performerFolderPath, pEntry.Name()))
+								if err != nil {
+									log.Printf("Failed to get relative path for preview %s: %v", pEntry.Name(), err)
+									continue
+								}
+								previews = append(previews, filepath.ToSlash(relativePath))
+							}
 						}
-						previews = append(previews, filepath.ToSlash(relativePath))
+						performer.Previews = previews
+						log.Printf("Found %d previews for %s.", len(previews), pName)
 					}
-				}
-				newPerformer.Previews = previews
-				log.Printf("Found %d previews for %s.", len(previews), pName)
-			}
-			newPerformersToInsert <- newPerformer // Send processed performer to channel
-		}(performerName)
-	}
+					newPerformersToInsert <- performer // Send processed performer to channel
+				}(performerName)	}
 
 	wg.Wait() // Wait for all goroutines to finish
 	close(newPerformersToInsert) // Close the channel after all goroutines are done
@@ -1356,205 +1229,7 @@ func autoAddPerformersFromFolders() {
 	log.Println("Finished checking for new performers.")
 }
 
-func fetchPerformerMetadataHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
 
-	performerName := strings.TrimPrefix(r.URL.Path, "/api/performers/")
-	performerName = strings.TrimSuffix(performerName, "/fetch-metadata")
-	if performerName == "" {
-		http.Error(w, "Performer name not specified", http.StatusBadRequest)
-		return
-	}
-
-	log.Printf("Fetching metadata for performer: %s", performerName)
-
-	// Fetch performer data from Adultdatalink API
-	performerDataBytes, err := fetchPerformerData(performerName)
-	if err != nil {
-		log.Printf("Failed to fetch data for performer %s from Adultdatalink API: %v", performerName, err)
-		http.Error(w, fmt.Sprintf("Failed to fetch metadata: %v", err), http.StatusInternalServerError)
-		return
-	}
-
-	var rawAPIResponse map[string]interface{}
-	if err := json.Unmarshal(performerDataBytes, &rawAPIResponse); err != nil {
-		log.Printf("Failed to unmarshal raw Adultdatalink API response for %s: %v", performerName, err)
-		http.Error(w, "Failed to process API response", http.StatusInternalServerError)
-		return
-	}
-
-	newPerformer := newDefaultPerformer() // Start with the default template
-	newPerformer.Name = performerName
-
-	// Process Aliases
-	if aliases, ok := rawAPIResponse["aliases"]; ok {
-		if aliasesList, ok := aliases.([]interface{}); ok {
-			for _, alias := range aliasesList {
-				if aliasMap, ok := alias.(map[string]interface{}); ok {
-					for k := range aliasMap {
-						newPerformer.Aliases = append(newPerformer.Aliases, k)
-					}
-				} else if aliasStr, ok := alias.(string); ok {
-					newPerformer.Aliases = append(newPerformer.Aliases, aliasStr)
-				}
-			}
-		} else if aliasStr, ok := aliases.(string); ok {
-			newPerformer.Aliases = append(newPerformer.Aliases, aliasStr)
-		}
-	}
-
-	// Process Tags
-	if tags, ok := rawAPIResponse["tags"]; ok {
-		if tagsList, ok := tags.([]interface{}); ok {
-			for _, tag := range tagsList {
-				if tagMap, ok := tag.(map[string]interface{}); ok {
-					for k := range tagMap {
-						newPerformer.Tags = append(newPerformer.Tags, k)
-					}
-				} else if tagStr, ok := tag.(string); ok {
-					newPerformer.Tags = append(newPerformer.Tags, tagStr)
-				}
-			}
-		} else if tagStr, ok := tags.(string); ok {
-			newPerformer.Tags = append(newPerformer.Tags, tagStr)
-		}
-	}
-
-	// Populate other fields from rawAPIResponse
-	if imageURL, ok := rawAPIResponse["image_url"].(string); ok && imageURL != "" {
-		newPerformer.ImageURL = imageURL
-	}
-	if appearance, ok := rawAPIResponse["appearance"].(map[string]interface{}); ok && len(appearance) > 0 {
-		newPerformer.Appearance = appearance
-	}
-	if performances, ok := rawAPIResponse["performances"].(map[string]interface{}); ok && len(performances) > 0 {
-		newPerformer.Performances = performances
-	}
-	if socialMedia, ok := rawAPIResponse["social_media"].(map[string]interface{}); ok && len(socialMedia) > 0 {
-		newPerformer.SocialMedia = socialMedia
-	}
-	if platformViews, ok := rawAPIResponse["platform_views"].(map[string]interface{}); ok && len(platformViews) > 0 {
-		newPerformer.PlatformViews = platformViews
-	}
-	if platformVideoCounts, ok := rawAPIResponse["platform_video_counts"].(map[string]interface{}); ok && len(platformVideoCounts) > 0 {
-		newPerformer.PlatformVideoCounts = platformVideoCounts
-	}
-	if platformProfileCounts, ok := rawAPIResponse["platform_profile_counts"].(map[string]interface{}); ok && len(platformProfileCounts) > 0 {
-		newPerformer.PlatformProfileCounts = platformProfileCounts
-	}
-	if externalLinks, ok := rawAPIResponse["external_links"].([]interface{}); ok && len(externalLinks) > 0 {
-		// Convert []interface{} to []map[string]string
-		var convertedLinks []map[string]string
-		for _, link := range externalLinks {
-			if linkMap, isMap := link.(map[string]interface{}); isMap {
-				convertedLink := make(map[string]string)
-				for k, v := range linkMap {
-					if strVal, isString := v.(string); isString {
-						convertedLink[k] = strVal
-					}
-				}
-				convertedLinks = append(convertedLinks, convertedLink)
-			}
-		}
-		newPerformer.ExternalLinks = convertedLinks
-	}
-	if bios, ok := rawAPIResponse["bios"]; ok {
-		if biosMap, isMap := bios.(map[string]interface{}); isMap {
-			convertedBios := make(map[string]string)
-			for k, v := range biosMap {
-				if strVal, isString := v.(string); isString {
-					convertedBios[k] = strVal
-				}
-			}
-			newPerformer.Bios = convertedBios
-		}
-	}
-	if officialWebsite, ok := rawAPIResponse["official_website"].(string); ok && officialWebsite != "" {
-		newPerformer.OfficialWebsite = officialWebsite
-	}
-	if featureDancer, ok := rawAPIResponse["feature_dancer"].(string); ok && featureDancer != "" {
-		newPerformer.FeatureDancer = featureDancer
-	}
-	if dateOfBirth, ok := rawAPIResponse["date_of_birth"].(string); ok && dateOfBirth != "" {
-		newPerformer.DateOfBirth = dateOfBirth
-	}
-	if age, ok := rawAPIResponse["age"].(string); ok && age != "" {
-		newPerformer.Age = age
-	}
-	if sexualOrientation, ok := rawAPIResponse["sexual_orientation"].(string); ok && sexualOrientation != "" {
-		newPerformer.SexualOrientation = sexualOrientation
-	}
-	if astrologicalSign, ok := rawAPIResponse["astrological_sign"].(string); ok && astrologicalSign != "" {
-		newPerformer.AstrologicalSign = astrologicalSign
-	}
-	if profession, ok := rawAPIResponse["profession"].(string); ok && profession != "" {
-		newPerformer.Profession = profession
-	}
-	if careerStatus, ok := rawAPIResponse["career_status"].(string); ok && careerStatus != "" {
-		newPerformer.CareerStatus = careerStatus
-	}
-	if careerStart, ok := rawAPIResponse["career_start"].(string); ok && careerStart != "" {
-		newPerformer.CareerStart = careerStart
-	}
-	if careerEnd, ok := rawAPIResponse["career_end"].(string); ok && careerEnd != "" {
-		newPerformer.CareerEnd = careerEnd
-	}
-	if dateOfDeath, ok := rawAPIResponse["date_of_death"].(string); ok && dateOfDeath != "" {
-		newPerformer.DateOfDeath = dateOfDeath
-	}
-	if placeOfBirth, ok := rawAPIResponse["place_of_birth"].(string); ok && placeOfBirth != "" {
-		newPerformer.PlaceOfBirth = placeOfBirth
-	}
-	if nationality, ok := rawAPIResponse["nationality"].(string); ok && nationality != "" {
-		newPerformer.Nationality = nationality
-	}
-	if rank, ok := rawAPIResponse["rank"].(string); ok && rank != "" {
-		newPerformer.Rank = rank
-	}
-	if country, ok := rawAPIResponse["country"].(string); ok && country != "" {
-		newPerformer.Country = country
-	}
-	if avatar, ok := rawAPIResponse["avatar"].(string); ok && avatar != "" {
-		newPerformer.Avatar = avatar
-	}
-	if subscribers, ok := rawAPIResponse["subscribers"].(float64); ok {
-		newPerformer.Subscribers = int(subscribers)
-	}
-	if rating, ok := rawAPIResponse["rating"].(float64); ok {
-		newPerformer.Rating = int(rating)
-	}
-	if totalViews, ok := rawAPIResponse["total_views"].(float64); ok {
-		newPerformer.TotalViews = int(totalViews)
-	}
-	if totalVideoCount, ok := rawAPIResponse["total_video_count"].(float64); ok {
-		newPerformer.TotalVideoCount = int(totalVideoCount)
-	}
-	if totalPlatformHits, ok := rawAPIResponse["total_platform_hits"].(float64); ok {
-		newPerformer.TotalPlatformHits = int(totalPlatformHits)
-	}
-
-	// Update the performer in the database
-	updatedPerformerJSON, err := json.Marshal(newPerformer)
-	if err != nil {
-		log.Printf("Failed to marshal updated performer %s to JSON: %v", performerName, err)
-		http.Error(w, "Failed to process performer data", http.StatusInternalServerError)
-		return
-	}
-
-	_, err = db.Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), performerName)
-	if err != nil {
-		log.Printf("Failed to update performer %s in database: %v", performerName, err)
-		http.Error(w, "Failed to update performer data in database", http.StatusInternalServerError)
-		return
-	}
-
-	log.Printf("Successfully fetched and updated metadata for %s.", performerName)
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Metadata fetched and updated successfully"})
-}
 
 func refetchAllPerformerMetadataHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -1583,7 +1258,7 @@ func refetchAllPerformerMetadataHandler(w http.ResponseWriter, r *http.Request) 
 					return
 				}
 
-				var rawAPIResponse map[string]interface{}
+				var rawAPIResponse map[string]interface{} 
 				if err := json.Unmarshal(performerDataBytes, &rawAPIResponse); err != nil {
 					log.Printf("Failed to unmarshal raw Adultdatalink API response for %s: %v", name, err)
 					return
@@ -1601,43 +1276,168 @@ func refetchAllPerformerMetadataHandler(w http.ResponseWriter, r *http.Request) 
 					return
 				}
 
-				// Update performer fields from rawAPIResponse
-				// (This part is very similar to fetchPerformerMetadataHandler and autoAddPerformersFromFolders)
-				// Process Aliases
+				populatePerformerFromAPIResponse(&performer, rawAPIResponse)
+
+
+				updatedPerformerJSON, err := json.Marshal(performer)
+				if err != nil {
+					log.Printf("Failed to marshal updated performer %s to JSON: %v", name, err)
+					return
+				}
+
+				_, err = db.Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), name)
+				if err != nil {
+					log.Printf("Failed to update performer %s in database: %v", name, err)
+					return
+				}
+				log.Printf("Successfully refetched and updated metadata for %s.", name)
+			}(pName)
+		}
+		wg.Wait()
+		log.Println("Finished refetching all performer metadata.")
+	}()
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Task to refetch all performer metadata started."})
+}
+
+func updatePerformerPreviewsTask() {
+	log.Println("Starting update performer previews task...")
+
+rows, err := db.Query("SELECT name, data FROM performers")
+	if err != nil {
+		log.Printf("Failed to query performers for preview update: %v", err)
+		return
+	}
+	defer rows.Close()
+
+	var wg sync.WaitGroup
+	performersToUpdate := make(chan Performer, 100) // Buffer channel
+
+	for rows.Next() {
+		var name string
+		var performerJSON string
+		if err := rows.Scan(&name, &performerJSON); err != nil {
+			log.Printf("Failed to scan performer data for preview update: %v", err)
+			continue
+		}
+
+		var performer Performer
+		if err := json.Unmarshal([]byte(performerJSON), &performer); err != nil {
+			log.Printf("Failed to unmarshal performer JSON for %s: %v", name, err)
+			continue
+		}
+
+		wg.Add(1)
+		go func(p Performer) {
+			defer wg.Done()
+
+			performerFolderPath := filepath.Join(performerFoldersDir, p.Name)
+			currentPreviews := []string{}
+
+			performerEntries, err := os.ReadDir(performerFolderPath)
+			if err != nil {
+				log.Printf("Failed to read performer folder %s for previews: %v", performerFolderPath, err)
+			} else {
+				for _, entry := range performerEntries {
+					ext := strings.ToLower(filepath.Ext(entry.Name()))
+					if !entry.IsDir() && ext == ".mkv" {
+						relativePath, err := filepath.Rel(performerFoldersDir, filepath.Join(performerFolderPath, entry.Name()))
+						if err != nil {
+							log.Printf("Failed to get relative path for preview %s: %v", entry.Name(), err)
+							continue
+						}
+						currentPreviews = append(currentPreviews, filepath.ToSlash(relativePath))
+					}
+				}
+			}
+
+			// Compare current previews with stored previews
+			if !compareStringSlices(p.Previews, currentPreviews) {
+				log.Printf("Previews changed for %s. Updating...", p.Name)
+				p.Previews = currentPreviews
+				// If default preview is no longer valid, clear it
+				if p.DefaultPreview != "" && !containsString(currentPreviews, p.DefaultPreview) {
+					p.DefaultPreview = ""
+				}
+				performersToUpdate <- p
+			}
+		}(performer)
+	}
+
+	wg.Wait()
+	close(performersToUpdate)
+
+	// Batch update database
+	for p := range performersToUpdate {
+		updatedJSON, err := json.Marshal(p)
+		if err != nil {
+			log.Printf("Failed to marshal updated performer %s to JSON: %v", p.Name, err)
+			continue
+		}
+		_, err = db.Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedJSON), p.Name)
+		if err != nil {
+			log.Printf("Failed to update performer %s in database: %v", p.Name, err)
+		}
+	}
+	log.Println("Update performer previews task completed.")
+}
+
+// Helper function to compare two string slices
+func compareStringSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// Helper function to check if a string is in a slice
+func containsString(slice []string, s string) bool {
+	for _, v := range slice {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
+func populatePerformerFromAPIResponse(performer *Performer, rawAPIResponse map[string]interface{}) {
+	// Process Aliases
 	if aliases, ok := rawAPIResponse["aliases"]; ok {
 		if aliasesList, ok := aliases.([]interface{}); ok {
-			var tempAliases []string
 			for _, alias := range aliasesList {
 				if aliasMap, ok := alias.(map[string]interface{}); ok {
 					for k := range aliasMap {
-						tempAliases = append(tempAliases, k)
+						performer.Aliases = append(performer.Aliases, k)
 					}
 				} else if aliasStr, ok := alias.(string); ok {
-					tempAliases = append(tempAliases, aliasStr)
+					performer.Aliases = append(performer.Aliases, aliasStr)
 				}
 			}
-			performer.Aliases = tempAliases
 		} else if aliasStr, ok := aliases.(string); ok {
-			performer.Aliases = []string{aliasStr}
+			performer.Aliases = append(performer.Aliases, aliasStr)
 		}
 	}
 
 	// Process Tags
 	if tags, ok := rawAPIResponse["tags"]; ok {
 		if tagsList, ok := tags.([]interface{}); ok {
-			var tempTags []string
 			for _, tag := range tagsList {
 				if tagMap, ok := tag.(map[string]interface{}); ok {
 					for k := range tagMap {
-						tempTags = append(tempTags, k)
+						performer.Tags = append(performer.Tags, k)
 					}
 				} else if tagStr, ok := tag.(string); ok {
-					tempTags = append(tempTags, tagStr)
+					performer.Tags = append(performer.Tags, tagStr)
 				}
 			}
-			performer.Tags = tempTags
 		} else if tagStr, ok := tags.(string); ok {
-			performer.Tags = []string{tagStr}
+			performer.Tags = append(performer.Tags, tagStr)
 		}
 	}
 
@@ -1753,135 +1553,9 @@ func refetchAllPerformerMetadataHandler(w http.ResponseWriter, r *http.Request) 
 	if totalPlatformHits, ok := rawAPIResponse["total_platform_hits"].(float64); ok {
 		performer.TotalPlatformHits = int(totalPlatformHits)
 	}
-
-
-				updatedPerformerJSON, err := json.Marshal(performer)
-				if err != nil {
-					log.Printf("Failed to marshal updated performer %s to JSON: %v", name, err)
-					return
-				}
-
-				_, err = db.Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), name)
-				if err != nil {
-					log.Printf("Failed to update performer %s in database: %v", name, err)
-					return
-				}
-				log.Printf("Successfully refetched and updated metadata for %s.", name)
-			}(pName)
-		}
-		wg.Wait()
-		log.Println("Finished refetching all performer metadata.")
-	}()
-
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Task to refetch all performer metadata started."})
 }
 
-func updatePerformerPreviewsTask() {
-	log.Println("Starting update performer previews task...")
-	rows, err := db.Query("SELECT name, data FROM performers")
-	if err != nil {
-		log.Printf("Failed to query performers for preview update: %v", err)
-		return
-	}
-	defer rows.Close()
-
-	var wg sync.WaitGroup
-	performersToUpdate := make(chan Performer, 100) // Buffer channel
-
-	for rows.Next() {
-		var name string
-		var performerJSON string
-		if err := rows.Scan(&name, &performerJSON); err != nil {
-			log.Printf("Failed to scan performer data for preview update: %v", err)
-			continue
-		}
-
-		var performer Performer
-		if err := json.Unmarshal([]byte(performerJSON), &performer); err != nil {
-			log.Printf("Failed to unmarshal performer JSON for %s: %v", name, err)
-			continue
-		}
-
-		wg.Add(1)
-		go func(p Performer) {
-			defer wg.Done()
-
-			performerFolderPath := filepath.Join(performerFoldersDir, p.Name)
-			currentPreviews := []string{}
-
-			performerEntries, err := os.ReadDir(performerFolderPath)
-			if err != nil {
-				log.Printf("Failed to read performer folder %s for previews: %v", performerFolderPath, err)
-			} else {
-				for _, entry := range performerEntries {
-					ext := strings.ToLower(filepath.Ext(entry.Name()))
-					if !entry.IsDir() && ext == ".mkv" {
-						relativePath, err := filepath.Rel(performerFoldersDir, filepath.Join(performerFolderPath, entry.Name()))
-						if err != nil {
-							log.Printf("Failed to get relative path for preview %s: %v", entry.Name(), err)
-							continue
-						}
-						currentPreviews = append(currentPreviews, filepath.ToSlash(relativePath))
-					}
-				}
-			}
-
-			// Compare current previews with stored previews
-			if !compareStringSlices(p.Previews, currentPreviews) {
-				log.Printf("Previews changed for %s. Updating...", p.Name)
-				p.Previews = currentPreviews
-				// If default preview is no longer valid, clear it
-				if p.DefaultPreview != "" && !containsString(currentPreviews, p.DefaultPreview) {
-					p.DefaultPreview = ""
-				}
-				performersToUpdate <- p
-			}
-		}(performer)
-	}
-
-	wg.Wait()
-	close(performersToUpdate)
-
-	// Batch update database
-	for p := range performersToUpdate {
-		updatedJSON, err := json.Marshal(p)
-		if err != nil {
-			log.Printf("Failed to marshal updated performer %s to JSON: %v", p.Name, err)
-			continue
-		}
-		_, err = db.Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedJSON), p.Name)
-		if err != nil {
-			log.Printf("Failed to update performer %s in database: %v", p.Name, err)
-		}
-	}
-		log.Println("Update performer previews task completed.")
-	}
-	
-	// Helper function to compare two string slices
-	func compareStringSlices(a, b []string) bool {
-		if len(a) != len(b) {
-			return false
-		}
-		for i, v := range a {
-			if v != b[i] {
-				return false
-			}
-		}
-		return true
-	}
-	
-	// Helper function to check if a string is in a slice
-	func containsString(slice []string, s string) bool {
-		for _, v := range slice {
-			if v == s {
-				return true
-			}
-		}
-		return false
-	}
-	
-	func main() {
+func main() {
 	
 	setupLogging()
 	initDB()
@@ -1919,4 +1593,3 @@ func updatePerformerPreviewsTask() {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
-
