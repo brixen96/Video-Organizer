@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let libraries = [];
     let editingLibraryId = null;
     let contextMenuLibraryId = null;
+    let currentLibraryId = null;
 
     const librariesListContainer = document.getElementById('libraries-list-container');
     const addLibraryBtn = document.getElementById('add-library-button');
@@ -55,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const editLibraryMenu = document.getElementById('edit-library-menu');
     const deleteLibraryMenu = document.getElementById('delete-library-menu');
     const setDefaultLibraryMenu = document.getElementById('set-default-library-menu');
+    const librarySelect = document.getElementById('library-select');
 
     // Fetch libraries from backend API
     async function fetchLibraries() {
@@ -64,10 +66,57 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await resp.json();
             libraries = data;
             renderLibrariesList();
+            populateLibraryDropdown();
         } catch (err) {
             console.error('Error fetching libraries:', err);
             librariesListContainer.innerHTML = '<div class="empty-libraries">Failed to load libraries.</div>';
         }
+    }
+
+    function populateLibraryDropdown() {
+        if (!librarySelect) return;
+        // Clear existing
+        librarySelect.innerHTML = '';
+        if (!libraries || libraries.length === 0) {
+            const opt = document.createElement('option');
+            opt.textContent = 'No libraries';
+            opt.value = '';
+            librarySelect.appendChild(opt);
+            return;
+        }
+
+        // Determine default library (from server)
+        const defaultLib = libraries.find(l => l.isDefault) || libraries[0];
+
+        libraries.forEach(lib => {
+            const opt = document.createElement('option');
+            opt.value = String(lib.id);
+            opt.textContent = lib.name;
+            librarySelect.appendChild(opt);
+        });
+
+        // Prefer stored selection if available and valid
+        let stored = null;
+        try { stored = localStorage.getItem('selectedLibraryId'); } catch (e) { stored = null; }
+        if (stored && libraries.some(l => String(l.id) === stored)) {
+            librarySelect.value = stored;
+            currentLibraryId = parseInt(stored, 10);
+        } else {
+            librarySelect.value = String(defaultLib.id);
+            currentLibraryId = defaultLib.id;
+            try { localStorage.setItem('selectedLibraryId', String(currentLibraryId)); } catch (e) {}
+        }
+    }
+
+    if (librarySelect) {
+        librarySelect.addEventListener('change', (e) => {
+            const val = e.target.value;
+            currentLibraryId = val ? parseInt(val, 10) : null;
+            try { localStorage.setItem('selectedLibraryId', String(currentLibraryId)); } catch (e) {}
+            // Optionally do something when library changes (e.g., reload grid)
+            // For now we'll just log
+            console.log('Selected library:', currentLibraryId);
+        });
     }
 
     function renderLibrariesList() {

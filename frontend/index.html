@@ -8,16 +8,23 @@
 </head>
 <body>
     <nav class="navbar">
-        <div class="navbar-brand">Video Storage AI</div>
-        <ul class="nav-list nav-left">
-            <li><a href="#dashboard">Dashboard</a></li>
-            <li><a href="#scenes">Scenes</a></li>
-            <li><a href="#groups">Groups</a></li>
-            <li><a href="#studios">Studios</a></li>
-            <li><a href="#performers">Performers</a></li>
-            <li><a href="#tags">Tags</a></li>
-            <li><a href="#markers">Markers</a></li>
-        </ul>
+        <div class="navbar-left">
+            <div class="navbar-brand">Video Storage AI</div>
+            <div id="library-dropdown-container" class="library-dropdown-container">
+                <select id="library-select" aria-label="Select Library">
+                    <option>Loading libraries...</option>
+                </select>
+            </div>
+        </div>
+		<ul class="nav-list">
+	<li><a href="#dashboard">Dashboard</a></li>
+	<li><a href="#scenes">Scenes</a></li>
+	<li><a href="#groups">Groups</a></li>
+	<li><a href="#studios">Studios</a></li>
+	<li><a href="#performers">Performers</a></li>
+	<li><a href="#tags">Tags</a></li>
+	<li><a href="#markers">Markers</a></li>
+	</ul>
         <ul class="nav-list nav-right">
             <li><a href="#logs">Logs</a></li>
             <li><a href="#settings">Settings</a></li>
