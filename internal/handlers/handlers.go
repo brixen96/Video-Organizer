@@ -169,6 +169,180 @@ func PerformersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// LibrariesHandler handles listing and creating libraries
+func LibrariesHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		rows, err := database.GetDB().Query("SELECT id, name, path, is_default FROM libraries ORDER BY id ASC")
+		if err != nil {
+			log.Printf("Failed to query libraries: %v", err)
+			http.Error(w, "Failed to retrieve libraries", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var libs []models.Library
+		for rows.Next() {
+			var id int
+			var name, path string
+			var isDefaultInt int
+			if err := rows.Scan(&id, &name, &path, &isDefaultInt); err != nil {
+				log.Printf("Failed to scan library row: %v", err)
+				continue
+			}
+			libs = append(libs, models.Library{ID: id, Name: name, Path: path, IsDefault: isDefaultInt == 1})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(libs)
+		return
+
+	case http.MethodPost:
+		var lib models.Library
+		if err := json.NewDecoder(r.Body).Decode(&lib); err != nil {
+			log.Printf("Invalid request body for LibrariesHandler: %v", err)
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		tx, err := database.GetDB().Begin()
+		if err != nil {
+			log.Printf("Failed to begin transaction: %v", err)
+			http.Error(w, "Failed to create library", http.StatusInternalServerError)
+			return
+		}
+		if lib.IsDefault {
+			if _, err := tx.Exec("UPDATE libraries SET is_default = 0"); err != nil {
+				tx.Rollback()
+				log.Printf("Failed to unset existing defaults: %v", err)
+				http.Error(w, "Failed to create library", http.StatusInternalServerError)
+				return
+			}
+		}
+		res, err := tx.Exec("INSERT INTO libraries(name, path, is_default) VALUES(?, ?, ?)", lib.Name, lib.Path, boolToInt(lib.IsDefault))
+		if err != nil {
+			tx.Rollback()
+			log.Printf("Failed to insert library: %v", err)
+			http.Error(w, "Failed to create library", http.StatusInternalServerError)
+			return
+		}
+		id, _ := res.LastInsertId()
+		if err := tx.Commit(); err != nil {
+			log.Printf("Failed to commit library insert: %v", err)
+			http.Error(w, "Failed to create library", http.StatusInternalServerError)
+			return
+		}
+		lib.ID = int(id)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(lib)
+		return
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// LibraryDetailsHandler handles update/delete and set-default actions for a library
+func LibraryDetailsHandler(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/libraries/")
+	if path == "" {
+		http.Error(w, "Library ID not specified", http.StatusBadRequest)
+		return
+	}
+
+	// set-default action: /api/libraries/{id}/set-default
+	if strings.HasSuffix(path, "/set-default") {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		idStr := strings.TrimSuffix(path, "/set-default")
+		idStr = strings.Trim(idStr, "/")
+		id := idStr
+		// Start transaction
+		tx, err := database.GetDB().Begin()
+		if err != nil {
+			log.Printf("Failed to begin tx for set-default: %v", err)
+			http.Error(w, "Failed to set default", http.StatusInternalServerError)
+			return
+		}
+		if _, err := tx.Exec("UPDATE libraries SET is_default = 0"); err != nil {
+			tx.Rollback()
+			log.Printf("Failed to unset defaults: %v", err)
+			http.Error(w, "Failed to set default", http.StatusInternalServerError)
+			return
+		}
+		if _, err := tx.Exec("UPDATE libraries SET is_default = 1 WHERE id = ?", id); err != nil {
+			tx.Rollback()
+			log.Printf("Failed to set default for id %s: %v", id, err)
+			http.Error(w, "Failed to set default", http.StatusInternalServerError)
+			return
+		}
+		if err := tx.Commit(); err != nil {
+			log.Printf("Failed to commit set-default tx: %v", err)
+			http.Error(w, "Failed to set default", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"message": "Default library updated"})
+		return
+	}
+
+	// Trim any trailing slash
+	idStr := strings.Trim(path, "/")
+
+	switch r.Method {
+	case http.MethodPut:
+		var lib models.Library
+		if err := json.NewDecoder(r.Body).Decode(&lib); err != nil {
+			log.Printf("Invalid request body for update library: %v", err)
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		if lib.IsDefault {
+			if _, err := database.GetDB().Exec("UPDATE libraries SET is_default = 0"); err != nil {
+				log.Printf("Failed to unset defaults during update: %v", err)
+				http.Error(w, "Failed to update library", http.StatusInternalServerError)
+				return
+			}
+		}
+		if _, err := database.GetDB().Exec("UPDATE libraries SET name = ?, path = ?, is_default = ? WHERE id = ?", lib.Name, lib.Path, boolToInt(lib.IsDefault), idStr); err != nil {
+			log.Printf("Failed to update library %s: %v", idStr, err)
+			http.Error(w, "Failed to update library", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"message": "Library updated"})
+		return
+
+	case http.MethodDelete:
+		if _, err := database.GetDB().Exec("DELETE FROM libraries WHERE id = ?", idStr); err != nil {
+			log.Printf("Failed to delete library %s: %v", idStr, err)
+			http.Error(w, "Failed to delete library", http.StatusInternalServerError)
+			return
+		}
+		// Ensure there is a default library if none exists
+		var count int
+		_ = database.GetDB().QueryRow("SELECT COUNT(*) FROM libraries WHERE is_default = 1").Scan(&count)
+		if count == 0 {
+			// set first library as default
+			_, _ = database.GetDB().Exec("UPDATE libraries SET is_default = 1 WHERE id = (SELECT id FROM libraries ORDER BY id ASC LIMIT 1)")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"message": "Library deleted"})
+		return
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
 func PerformerDetailsHandler(w http.ResponseWriter, r *http.Request) {
 	var err error
 	performerName := strings.TrimPrefix(r.URL.Path, "/api/performers/")

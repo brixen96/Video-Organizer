@@ -36,6 +36,8 @@ func main() {
 	http.HandleFunc("/api/chat", handlers.ChatHandler)
 	http.HandleFunc("/api/performers", handlers.PerformersHandler)
 	http.HandleFunc("/api/performers/", handlers.PerformerDetailsHandler)
+	http.HandleFunc("/api/libraries", handlers.LibrariesHandler)
+	http.HandleFunc("/api/libraries/", handlers.LibraryDetailsHandler)
 	http.HandleFunc("/api/tasks/update-performer-previews", handlers.UpdatePerformerPreviewsHandler)
 	http.HandleFunc("/api/tasks/refetch-all-performer-metadata", handlers.RefetchAllPerformerMetadataHandler)
 	http.HandleFunc("/api/logs/previous", handlers.PreviousLogsHandler)

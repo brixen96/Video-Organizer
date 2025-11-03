@@ -320,6 +320,265 @@ body {
     display: block;
 }
 
+/* Libraries Management UI Styles */
+.libraries-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+}
+.add-library-btn {
+    background-color: #00aaff;
+    color: #fff;
+    border: none;
+    padding: 0.5rem 1.2rem;
+    border-radius: 4px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.add-library-btn:hover {
+    background-color: #0088cc;
+}
+.libraries-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #1f1f1f;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    margin-bottom: 1rem;
+}
+.libraries-table th, .libraries-table td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid #333;
+    font-size: 1rem;
+}
+.libraries-table th {
+    background: #222;
+    color: #00aaff;
+    font-weight: 600;
+}
+.libraries-table tr:last-child td {
+    border-bottom: none;
+}
+.library-row {
+    transition: background 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+}
+.library-row:hover {
+    background: #222;
+    box-shadow: 0 2px 8px rgba(0,170,255,0.08);
+}
+.default-icon {
+    color: #ffd700;
+    font-size: 1.2rem;
+    vertical-align: middle;
+}
+.library-name-cell .library-name-text {
+    font-weight: 600;
+    color: #fff;
+}
+.library-name-cell .default-icon {
+    margin-right: 0.5rem;
+}
+.library-actions-cell {
+    width: 48px;
+    text-align: right;
+}
+.row-actions-button {
+    background: transparent;
+    border: none;
+    color: #aaa;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+}
+.row-actions-button:hover {
+    background: rgba(255,255,255,0.04);
+    color: #fff;
+}
+.empty-libraries {
+    color: #aaa;
+    text-align: center;
+    padding: 2rem 0;
+    font-size: 1.1rem;
+}
+/* Modal for Add/Edit Library */
+#library-modal .library-modal-content {
+    max-width: 400px;
+    width: 100%;
+    background: #222;
+    border-radius: 8px;
+    padding: 2rem 2rem 1.5rem 2rem;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.4);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+#library-modal h2 {
+    margin-top: 0;
+    color: #00aaff;
+    font-size: 1.3rem;
+    margin-bottom: 1.2rem;
+}
+#library-form .form-group {
+    margin-bottom: 1.2rem;
+    display: flex;
+    flex-direction: column;
+}
+#library-form label {
+    font-weight: 500;
+    margin-bottom: 0.4rem;
+}
+#library-form input[type="text"] {
+    background: #333;
+    color: #fff;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 0.5rem;
+    font-size: 1rem;
+}
+#library-path-picker {
+    background: none;
+    border: none;
+    color: #00aaff;
+    font-size: 1.2rem;
+    margin-left: 0.5rem;
+    cursor: pointer;
+    vertical-align: middle;
+}
+#library-form .form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+#save-library-btn {
+    background: #00aaff;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 1.2rem;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+#save-library-btn:hover {
+    background: #0088cc;
+}
+#cancel-library-btn {
+    background: #555;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 1.2rem;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+#cancel-library-btn:hover {
+    background: #777;
+}
+/* Delete Modal */
+#delete-library-modal .delete-modal-content {
+    max-width: 350px;
+    width: 100%;
+    background: #222;
+    border-radius: 8px;
+    padding: 2rem 2rem 1.5rem 2rem;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.4);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+#delete-library-modal h2 {
+    margin-top: 0;
+    color: #ff5555;
+    font-size: 1.2rem;
+    margin-bottom: 1rem;
+}
+#delete-library-modal .form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+#confirm-delete-library-btn {
+    background: #ff5555;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 1.2rem;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+#confirm-delete-library-btn:hover {
+    background: #ff2222;
+}
+#cancel-delete-library-btn {
+    background: #555;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 1.2rem;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+#cancel-delete-library-btn:hover {
+    background: #777;
+}
+/* Context Menu for Libraries */
+#libraries-context-menu {
+    position: fixed;
+    min-width: 180px;
+    background: #222;
+    border: 1px solid #333;
+    border-radius: 6px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.45);
+    z-index: 3000;
+    font-size: 1rem;
+    padding: 0.3rem 0;
+}
+#libraries-context-menu ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+#libraries-context-menu ul li {
+    padding: 0.7rem 1.2rem;
+    cursor: pointer;
+    color: #fff;
+    transition: background 0.2s, color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+#libraries-context-menu ul li:hover {
+    background: #00aaff;
+    color: #fff;
+}
+/* Fade transitions for add/remove */
+.fade-in {
+    animation: fadeIn 0.3s;
+}
+.fade-out {
+    animation: fadeOut 0.3s forwards;
+}
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
 .tabs {
     margin-top: 20px;
     display: flex;

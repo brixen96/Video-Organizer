@@ -28,6 +28,306 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsPage = document.getElementById('settings-page');
     const scenesPage = document.getElementById('scenes-page');
 
+    // --- Libraries Management UI ---
+    let libraries = [];
+    let editingLibraryId = null;
+    let contextMenuLibraryId = null;
+
+    const librariesListContainer = document.getElementById('libraries-list-container');
+    const addLibraryBtn = document.getElementById('add-library-button');
+    const libraryModal = document.getElementById('library-modal');
+    const closeLibraryModalBtn = document.getElementById('close-library-modal');
+    const libraryForm = document.getElementById('library-form');
+    const libraryModalTitle = document.getElementById('library-modal-title');
+    const saveLibraryBtn = document.getElementById('save-library-btn');
+    const cancelLibraryBtn = document.getElementById('cancel-library-btn');
+    const libraryNameInput = document.getElementById('library-name');
+    const libraryPathInput = document.getElementById('library-path');
+    const libraryPathPickerBtn = document.getElementById('library-path-picker');
+
+    const deleteLibraryModal = document.getElementById('delete-library-modal');
+    const closeDeleteLibraryModalBtn = document.getElementById('close-delete-library-modal');
+    const deleteLibraryMessage = document.getElementById('delete-library-message');
+    const cancelDeleteLibraryBtn = document.getElementById('cancel-delete-library-btn');
+    const confirmDeleteLibraryBtn = document.getElementById('confirm-delete-library-btn');
+
+    const librariesContextMenu = document.getElementById('libraries-context-menu');
+    const editLibraryMenu = document.getElementById('edit-library-menu');
+    const deleteLibraryMenu = document.getElementById('delete-library-menu');
+    const setDefaultLibraryMenu = document.getElementById('set-default-library-menu');
+
+    // Fetch libraries from backend API
+    async function fetchLibraries() {
+        try {
+            const resp = await fetch('/api/libraries');
+            if (!resp.ok) throw new Error('Failed to fetch');
+            const data = await resp.json();
+            libraries = data;
+            renderLibrariesList();
+        } catch (err) {
+            console.error('Error fetching libraries:', err);
+            librariesListContainer.innerHTML = '<div class="empty-libraries">Failed to load libraries.</div>';
+        }
+    }
+
+    function renderLibrariesList() {
+        librariesListContainer.innerHTML = '';
+        if (libraries.length === 0) {
+            librariesListContainer.innerHTML = '<div class="empty-libraries">No libraries added yet.</div>';
+            return;
+        }
+        const table = document.createElement('table');
+        table.className = 'libraries-table';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>Library Name</th>
+                    <th>Path</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        `;
+        const tbody = table.querySelector('tbody');
+        libraries.forEach(lib => {
+            const tr = document.createElement('tr');
+            tr.className = 'library-row';
+            tr.dataset.id = lib.id;
+            // Build cells: name (with star), path, actions (kebab)
+            const nameCell = document.createElement('td');
+            nameCell.className = 'library-name-cell';
+            nameCell.innerHTML = `${lib.isDefault ? '<span class="default-icon" title="Default">⭐</span> ' : ''}<span class="library-name-text">${lib.name}</span>`;
+
+            const pathCell = document.createElement('td');
+            pathCell.className = 'library-path-cell';
+            pathCell.textContent = lib.path;
+
+            tr.appendChild(nameCell);
+            tr.appendChild(pathCell);
+
+            // Context menu on right-click (use client coords for viewport-fixed positioning)
+            tr.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                contextMenuLibraryId = lib.id;
+                showLibrariesContextMenu(e.clientX, e.clientY, lib);
+            });
+            tbody.appendChild(tr);
+        });
+        librariesListContainer.appendChild(table);
+    }
+
+    function showLibrariesContextMenu(x, y, lib) {
+        // Append to body to avoid clipping and compute clamped position
+        if (!document.body.contains(librariesContextMenu)) document.body.appendChild(librariesContextMenu);
+        // Use fixed positioning so menu is on top of other containers/scroll
+        librariesContextMenu.style.position = 'fixed';
+        librariesContextMenu.style.display = 'block';
+        // Show/hide Set as Default option
+        setDefaultLibraryMenu.style.display = lib.isDefault ? 'none' : 'block';
+
+        // Clamp to viewport using client (viewport) coordinates
+        const menuRect = librariesContextMenu.getBoundingClientRect();
+        const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+        const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+        let left = x;
+        let top = y;
+        // If menu not yet measured, force reflow
+        // (menuRect may be 0 if style just changed, so get after display)
+        const measured = librariesContextMenu.getBoundingClientRect();
+        if (left + measured.width > vw) left = vw - measured.width - 8;
+        if (top + measured.height > vh) top = vh - measured.height - 8;
+        if (left < 8) left = 8;
+        if (top < 8) top = 8;
+        librariesContextMenu.style.left = `${left}px`;
+        librariesContextMenu.style.top = `${top}px`;
+    }
+
+    function hideLibrariesContextMenu() {
+        librariesContextMenu.style.display = 'none';
+        contextMenuLibraryId = null;
+    }
+
+    // Add/Edit Modal Logic
+    function openLibraryModal(editing = false, lib = null) {
+        libraryModal.style.display = 'block';
+        libraryModalTitle.textContent = editing ? 'Edit Library' : 'Add Library';
+        if (editing && lib) {
+            libraryNameInput.value = lib.name;
+            libraryPathInput.value = lib.path;
+            editingLibraryId = lib.id;
+        } else {
+            libraryNameInput.value = '';
+            libraryPathInput.value = '';
+            editingLibraryId = null;
+        }
+    }
+    function closeLibraryModal() {
+        libraryModal.style.display = 'none';
+        editingLibraryId = null;
+    }
+
+    // Delete Modal Logic
+    function openDeleteLibraryModal(lib) {
+        deleteLibraryModal.style.display = 'block';
+        deleteLibraryMessage.textContent = `Are you sure you want to delete "${lib.name}"?`;
+        editingLibraryId = lib.id;
+    }
+    function closeDeleteLibraryModal() {
+        deleteLibraryModal.style.display = 'none';
+        editingLibraryId = null;
+    }
+
+    // Add/Edit/Delete/Set Default Actions
+    libraryForm.onsubmit = async function(e) {
+        e.preventDefault();
+        const name = libraryNameInput.value.trim();
+        const path = libraryPathInput.value.trim();
+        if (!name || !path) return;
+        try {
+            if (editingLibraryId) {
+                // Edit via PUT
+                const resp = await fetch(`/api/libraries/${editingLibraryId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, path })
+                });
+                if (!resp.ok) throw new Error('Failed to update');
+            } else {
+                // Create via POST
+                const resp = await fetch('/api/libraries', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, path, isDefault: false })
+                });
+                if (!resp.ok) throw new Error('Failed to create');
+            }
+            await fetchLibraries();
+            closeLibraryModal();
+        } catch (err) {
+            console.error('Error saving library:', err);
+            alert('Failed to save library');
+        }
+    };
+    cancelLibraryBtn.onclick = closeLibraryModal;
+    closeLibraryModalBtn.onclick = closeLibraryModal;
+
+    // Path picker (simulate folder picker)
+    // Path / Folder picker
+    libraryPathPickerBtn.onclick = function() {
+        const folderInput = document.getElementById('library-folder-input');
+        if (!folderInput) {
+            alert('Folder picker not available. Enter path manually.');
+            return;
+        }
+        // Reset and open
+        folderInput.value = null;
+        folderInput.click();
+    };
+
+    const folderInput = document.getElementById('library-folder-input');
+    if (folderInput) {
+        folderInput.addEventListener('change', (ev) => {
+            const files = ev.target.files;
+            if (!files || files.length === 0) return;
+            const first = files[0];
+            try {
+                // In Electron/Node-based webviews, file.path often exists and is an absolute path
+                if (first.path) {
+                    // Derive directory from the first file's path
+                    const p = first.path;
+                    const sep = p.includes('\\') ? '\\' : '/';
+                    const dir = p.substring(0, p.lastIndexOf(sep));
+                    libraryPathInput.value = dir;
+                    return;
+                }
+            } catch (e) {
+                // ignore
+            }
+
+            // Fallback: try to infer a sensible folder name from webkitRelativePath entries
+            const rels = Array.from(files).map(f => f.webkitRelativePath || '').filter(Boolean);
+            if (rels.length > 0) {
+                // Get the top-level segments for each relative path
+                const segments = rels.map(r => r.split('/')[0]).filter(Boolean);
+                const unique = [...new Set(segments)];
+                // If there's exactly one common top-level segment and it doesn't look like a label or a file
+                const suspiciousLabelRegex = /select folder|choose folder|upload/i;
+                const looksLikeFile = s => s.includes('.') && s.split('.').pop().length <= 5; // naive
+                if (unique.length === 1 && !suspiciousLabelRegex.test(unique[0]) && !looksLikeFile(unique[0])) {
+                    libraryPathInput.value = unique[0];
+                    return;
+                }
+
+                // As a fallback, try to compute the common directory prefix (up to first slash)
+                // If none, provide a generic placeholder that indicates a folder was selected
+                libraryPathInput.value = '(Selected Folder)';
+                return;
+            }
+
+            // Last resort: use file name
+            libraryPathInput.value = first.name || '(Selected Folder)';
+        });
+    }
+
+    // Context Menu Actions
+    editLibraryMenu.onclick = function() {
+        const lib = libraries.find(l => l.id === contextMenuLibraryId);
+        if (lib) openLibraryModal(true, lib);
+        hideLibrariesContextMenu();
+    };
+    deleteLibraryMenu.onclick = function() {
+        const lib = libraries.find(l => l.id === contextMenuLibraryId);
+        if (lib) openDeleteLibraryModal(lib);
+        hideLibrariesContextMenu();
+    };
+    setDefaultLibraryMenu.onclick = async function() {
+        try {
+            const resp = await fetch(`/api/libraries/${contextMenuLibraryId}/set-default`, { method: 'POST' });
+            if (!resp.ok) throw new Error('Failed to set default');
+            await fetchLibraries();
+        } catch (err) {
+            console.error('Error setting default:', err);
+            alert('Failed to set default library');
+        }
+        hideLibrariesContextMenu();
+    };
+
+    // Delete Confirmation Actions
+    confirmDeleteLibraryBtn.onclick = async function() {
+        try {
+            const resp = await fetch(`/api/libraries/${editingLibraryId}`, { method: 'DELETE' });
+            if (!resp.ok) throw new Error('Failed to delete');
+            await fetchLibraries();
+            closeDeleteLibraryModal();
+        } catch (err) {
+            console.error('Error deleting library:', err);
+            alert('Failed to delete library');
+        }
+    };
+    cancelDeleteLibraryBtn.onclick = closeDeleteLibraryModal;
+    closeDeleteLibraryModalBtn.onclick = closeDeleteLibraryModal;
+
+    // Add Library Button
+    addLibraryBtn.onclick = function() {
+        openLibraryModal(false);
+    };
+
+    // Hide context menu on click elsewhere
+    document.addEventListener('click', function(e) {
+        if (!librariesContextMenu.contains(e.target)) hideLibrariesContextMenu();
+    });
+
+    // Hide on escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') hideLibrariesContextMenu();
+    });
+
+    // Fade transitions for add/remove
+    librariesListContainer.addEventListener('animationend', function(e) {
+        if (e.target.classList.contains('fade-out')) e.target.remove();
+    });
+
+    // Initial fetch
+    fetchLibraries();
     let currentVideo = null;
     let allVideos = []; // Global variable to store all video data
     let allPerformers = []; // Global variable to store all performer data

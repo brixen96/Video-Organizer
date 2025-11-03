@@ -85,10 +85,17 @@ func InitDB() {
 		name TEXT NOT NULL UNIQUE,
 		data TEXT
 	);
+
+	CREATE TABLE IF NOT EXISTS libraries (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		path TEXT NOT NULL,
+		is_default INTEGER DEFAULT 0
+	);
 	`
 	_, err = db.Exec(sqlStmt)
 	if err != nil {
-		log.Fatalf("Failed to create performers table: %v", err)
+		log.Fatalf("Failed to create tables: %v", err)
 	}
 	log.Println("Database initialized and performers table ensured.")
 }

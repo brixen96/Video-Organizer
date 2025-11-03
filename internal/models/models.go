@@ -73,3 +73,11 @@ type VideoInfo struct {
 	Metadata   FFProbeOutput `json:"metadata"`
 	Performers []string      `json:"performers,omitempty"`
 }
+
+// Library represents a filesystem library configured in the app
+type Library struct {
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	Path      string `json:"path"`
+	IsDefault bool   `json:"isDefault"`
+}
