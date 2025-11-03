@@ -92,6 +92,20 @@ func InitDB() {
 		path TEXT NOT NULL,
 		is_default INTEGER DEFAULT 0
 	);
+
+	CREATE TABLE IF NOT EXISTS monitor_events (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		type TEXT,
+		category TEXT,
+		message TEXT,
+		level TEXT,
+		timestamp INTEGER
+	);
+
+	CREATE TABLE IF NOT EXISTS monitor_settings (
+		key TEXT PRIMARY KEY,
+		value TEXT
+	);
 	`
 	_, err = db.Exec(sqlStmt)
 	if err != nil {

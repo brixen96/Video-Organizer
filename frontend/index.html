@@ -15,18 +15,35 @@
                     <option>Loading libraries...</option>
                 </select>
             </div>
+            <div id="activity-monitor-container" class="activity-monitor-container">
+                <button id="activity-monitor-button" title="Activity Monitor">🔔 <span id="monitor-indicator" class="monitor-indicator monitor-green"></span></button>
+                <span id="monitor-status-text" class="monitor-status-text">Idle</span>
+                <div id="activity-monitor-panel" class="activity-monitor-panel hidden">
+                    <div class="activity-monitor-header">
+                        <span>App Activity</span>
+                        <div class="activity-monitor-actions">
+                            <button id="monitor-clear-btn">Clear</button>
+                        </div>
+                    </div>
+                    <div id="monitor-panel-status" class="monitor-panel-status">No activity</div>
+                    <div id="activity-monitor-filters" class="activity-monitor-filters">
+                        <!-- basic filter badges will be inserted by JS -->
+                    </div>
+                    <ul id="activity-monitor-list" class="activity-monitor-list"></ul>
+                </div>
+            </div>
         </div>
-		<ul class="nav-list">
-	<li><a href="#dashboard">Dashboard</a></li>
-	<li><a href="#scenes">Scenes</a></li>
-	<li><a href="#groups">Groups</a></li>
-	<li><a href="#studios">Studios</a></li>
-	<li><a href="#performers">Performers</a></li>
-	<li><a href="#tags">Tags</a></li>
-	<li><a href="#markers">Markers</a></li>
-	</ul>
+		<ul class="nav-list nav-center">
+			<li><a href="#dashboard">Dashboard</a></li>
+			<li><a href="#scenes">Scenes</a></li>
+			<li><a href="#groups">Groups</a></li>
+			<li><a href="#studios">Studios</a></li>
+			<li><a href="#performers">Performers</a></li>
+			<li><a href="#tags">Tags</a></li>
+			<li><a href="#markers">Markers</a></li>
+		</ul>
         <ul class="nav-list nav-right">
-            <li><a href="#logs">Logs</a></li>
+			<li><a href="#logs">Logs</a></li>
             <li><a href="#settings">Settings</a></li>
         </ul>
     </nav>
@@ -112,7 +129,24 @@
                     </div>
                     <div id="interface" class="tab-pane hidden">
                         <h3>Interface Settings</h3>
-                        <p>Content for Interface settings...</p>
+                        <div class="monitor-settings">
+                            <h4>App Activity Monitor</h4>
+                            <p>Choose which categories of events should appear in the Activity Monitor. Settings persist in your browser.</p>
+                            <div class="monitor-toggle-group">
+                                <label><input type="checkbox" id="ms-toggle-task" checked> [Task] Events</label>
+                                <label><input type="checkbox" id="ms-toggle-progress" checked> [Progress] Events</label>
+                                <label><input type="checkbox" id="ms-toggle-info" checked> [Info] Events</label>
+                                <label><input type="checkbox" id="ms-toggle-warning" checked> [Warning] Events</label>
+                                <label><input type="checkbox" id="ms-toggle-error" checked> [Error] Events</label>
+                            </div>
+                            <div class="monitor-toggle-group">
+                                <label><input type="checkbox" id="ms-errors-only"> Errors Only Mode</label>
+                            </div>
+                            <div class="monitor-toggle-actions">
+                                <button id="ms-save-btn">Save Monitor Settings</button>
+                                <button id="ms-reset-btn">Reset to Defaults</button>
+                            </div>
+                        </div>
                     </div>
                     <div id="metadata" class="tab-pane hidden">
                         <h3>Metadata Providers Settings</h3>

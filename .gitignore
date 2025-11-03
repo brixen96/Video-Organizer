@@ -17,6 +17,7 @@ assets
 *.log
 old_logs
 app.log
+*.db
 
 # Test binary, built with `go test -c`
 *.test

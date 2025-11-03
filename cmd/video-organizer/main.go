@@ -5,14 +5,13 @@ import (
 	"log"
 	"net/http"
 
+	"video-organizer/internal/appstatus"
 	"video-organizer/internal/database"
 	"video-organizer/internal/handlers"
 	"video-organizer/internal/logging"
 	"video-organizer/internal/performer"
 	"video-organizer/internal/video"
 )
-
-
 
 func main() {
 
@@ -38,6 +37,10 @@ func main() {
 	http.HandleFunc("/api/performers/", handlers.PerformerDetailsHandler)
 	http.HandleFunc("/api/libraries", handlers.LibrariesHandler)
 	http.HandleFunc("/api/libraries/", handlers.LibraryDetailsHandler)
+	http.HandleFunc("/api/monitor/subscribe", appstatus.SSEHandler)
+	http.HandleFunc("/api/monitor/event", handlers.MonitorEmitHandler)
+	http.HandleFunc("/api/monitor/events", handlers.MonitorEventsHandler)
+	http.HandleFunc("/api/monitor/settings", handlers.MonitorSettingsHandler)
 	http.HandleFunc("/api/tasks/update-performer-previews", handlers.UpdatePerformerPreviewsHandler)
 	http.HandleFunc("/api/tasks/refetch-all-performer-metadata", handlers.RefetchAllPerformerMetadataHandler)
 	http.HandleFunc("/api/logs/previous", handlers.PreviousLogsHandler)

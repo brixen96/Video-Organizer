@@ -8,8 +8,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+
+	"video-organizer/internal/appstatus"
 
 	"video-organizer/internal/config"
 	"video-organizer/internal/database"
@@ -19,6 +22,7 @@ import (
 )
 
 func VideosHandler(w http.ResponseWriter, r *http.Request) {
+	appstatus.EmitInfo("videos", "List videos requested")
 	var videos []models.VideoInfo
 	for _, v := range video.GetVideoCache() {
 		videos = append(videos, v)
@@ -38,19 +42,23 @@ func RenameHandler(w http.ResponseWriter, r *http.Request) {
 	var req models.RenameRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Println("Invalid request body for RenameHandler:", err)
+		appstatus.EmitError("videos", "Invalid rename request body")
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+	appstatus.EmitInfo("videos", fmt.Sprintf("Rename requested: %s -> %s", req.OldName, req.NewName))
 
 	// Rename video file
 	oldVideoPath := filepath.Join(config.VideoDir, req.OldName)
 	newVideoPath := filepath.Join(config.VideoDir, req.NewName)
 	if err := os.Rename(oldVideoPath, newVideoPath); err != nil {
 		log.Println("Failed to rename video", req.OldName, ":", err)
+		appstatus.EmitError("videos", fmt.Sprintf("Failed to rename %s: %v", req.OldName, err))
 		http.Error(w, fmt.Sprintf("Failed to rename video: %v", err), http.StatusInternalServerError)
 		return
 	}
 	log.Println("Successfully renamed video from", req.OldName, "to", req.NewName)
+	appstatus.EmitInfo("videos", fmt.Sprintf("Renamed %s -> %s", req.OldName, req.NewName))
 
 	// Rename thumbnail file
 	oldThumbName := fmt.Sprintf("%s.jpg", strings.TrimSuffix(req.OldName, filepath.Ext(req.OldName)))
@@ -92,9 +100,11 @@ func ChatHandler(w http.ResponseWriter, r *http.Request) {
 	var msg models.ChatMessage
 	if err := json.NewDecoder(r.Body).Decode(&msg); err != nil {
 		log.Println("Invalid request body for ChatHandler:", err)
+		appstatus.EmitError("chat", "Invalid chat request body")
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+	appstatus.EmitInfo("chat", fmt.Sprintf("Chat message received: %.80s", msg.Message))
 
 	// Basic AI response logic
 	reply := "I am a simple AI. I don't have much to say yet."
@@ -129,10 +139,12 @@ func PerformersHandler(w http.ResponseWriter, r *http.Request) {
 		_, err = database.GetDB().Exec("INSERT INTO performers(name, data) VALUES(?, ?)", performer.Name, string(performerJSON))
 		if err != nil {
 			log.Println("Failed to insert performer into database:", err)
+			appstatus.EmitError("performers", fmt.Sprintf("Failed to add performer: %v", err))
 			http.Error(w, "Failed to add performer", http.StatusInternalServerError)
 			return
 		}
 
+		appstatus.EmitInfo("performers", fmt.Sprintf("Performer added: %s", performer.Name))
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Performer added successfully"})
 
@@ -194,6 +206,7 @@ func LibrariesHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(libs)
+		appstatus.EmitInfo("libraries", fmt.Sprintf("Listed libraries (%d)", len(libs)))
 		return
 
 	case http.MethodPost:
@@ -234,6 +247,7 @@ func LibrariesHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(lib)
+		appstatus.EmitInfo("libraries", fmt.Sprintf("Created library: %s (%d)", lib.Name, lib.ID))
 		return
 
 	default:
@@ -284,6 +298,7 @@ func LibraryDetailsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"message": "Default library updated"})
+		appstatus.EmitInfo("libraries", fmt.Sprintf("Set default library id=%s", idStr))
 		return
 	}
 
@@ -312,6 +327,7 @@ func LibraryDetailsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"message": "Library updated"})
+		appstatus.EmitInfo("libraries", fmt.Sprintf("Updated library id=%s", idStr))
 		return
 
 	case http.MethodDelete:
@@ -329,6 +345,7 @@ func LibraryDetailsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"message": "Library deleted"})
+		appstatus.EmitInfo("libraries", fmt.Sprintf("Deleted library id=%s", idStr))
 		return
 
 	default:
@@ -402,6 +419,7 @@ func PerformerDetailsHandler(w http.ResponseWriter, r *http.Request) {
 
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Default preview updated successfully"})
+		appstatus.EmitInfo("performers", fmt.Sprintf("Set default preview for %s", performerName))
 		return
 	}
 
@@ -460,6 +478,7 @@ func PerformerDetailsHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("DEBUG: Successfully updated zoo status for %s in database.", performerName)
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Zoo status updated successfully"})
+		appstatus.EmitInfo("performers", fmt.Sprintf("Zoo status updated for %s: %s", performerName, payload.Zoo))
 		return
 	}
 
@@ -519,6 +538,7 @@ func PerformerDetailsHandler(w http.ResponseWriter, r *http.Request) {
 
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Metadata reset successfully"})
+		appstatus.EmitInfo("performers", fmt.Sprintf("Reset metadata for %s", performerName))
 		return
 	}
 
@@ -595,6 +615,7 @@ func PerformerDetailsHandler(w http.ResponseWriter, r *http.Request) {
 
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Previews reset successfully"})
+		appstatus.EmitInfo("performers", fmt.Sprintf("Reset previews for %s (%d previews)", performerName, len(previews)))
 		return
 	}
 
@@ -681,6 +702,7 @@ func PerformerDetailsHandler(w http.ResponseWriter, r *http.Request) {
 
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Metadata fetched and updated successfully"})
+		appstatus.EmitInfo("metadata", fmt.Sprintf("Fetched metadata for %s", trimmedPerformerName))
 		return
 	}
 
@@ -717,165 +739,326 @@ func PerformerDetailsHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(p)
-}		
-		func UpdatePerformerPreviewsHandler(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodPost {
-				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-				return
-			}
-		
-			go performer.UpdatePerformerPreviewsTask() // Run the task in a goroutine to avoid blocking the HTTP request
-		
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]string{"message": "Update performer previews task started."})
+}
+func UpdatePerformerPreviewsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	go func() {
+		appstatus.EmitInfo("tasks", "Update performer previews task started")
+		// run task and emit basic lifecycle events
+		performer.UpdatePerformerPreviewsTask()
+		appstatus.EmitInfo("tasks", "Update performer previews task finished")
+	}()
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Update performer previews task started."})
+}
+
+func VideoStreamHandler(w http.ResponseWriter, r *http.Request) {
+	videoName := strings.TrimPrefix(r.URL.Path, "/video/")
+	if videoName == "" {
+		log.Println("Video name not specified in stream request")
+		http.Error(w, "Video name not specified", http.StatusBadRequest)
+		return
+	}
+
+	videoPath := filepath.Join(config.VideoDir, videoName)
+	appstatus.EmitInfo("videos", fmt.Sprintf("Streaming video: %s", videoName))
+
+	// Serve the video file
+	http.ServeFile(w, r, videoPath)
+}
+
+func PreviousLogsHandler(w http.ResponseWriter, r *http.Request) {
+	files, err := os.ReadDir(config.OldLogsDir)
+	if err != nil {
+		log.Println("Failed to read old logs directory:", err)
+		http.Error(w, "Failed to read old logs directory", http.StatusInternalServerError)
+		return
+	}
+
+	var logFiles []string
+	for _, file := range files {
+		if !file.IsDir() {
+			logFiles = append(logFiles, file.Name())
 		}
-		
-		func VideoStreamHandler(w http.ResponseWriter, r *http.Request) {
-			videoName := strings.TrimPrefix(r.URL.Path, "/video/")
-			if videoName == "" {
-				log.Println("Video name not specified in stream request")
-				http.Error(w, "Video name not specified", http.StatusBadRequest)
-				return
-			}
-		
-			videoPath := filepath.Join(config.VideoDir, videoName)
-		
-			// Serve the video file
-			http.ServeFile(w, r, videoPath)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(logFiles)
+	appstatus.EmitInfo("logs", fmt.Sprintf("Listed previous logs (%d)", len(logFiles)))
+}
+
+func PreviousLogFileHandler(w http.ResponseWriter, r *http.Request) {
+	fileName := strings.TrimPrefix(r.URL.Path, "/api/logs/previous/")
+	if fileName == "" {
+		log.Println("Log file name not specified in request")
+		http.Error(w, "Log file name not specified", http.StatusBadRequest)
+		return
+	}
+
+	filePath := filepath.Join(config.OldLogsDir, fileName)
+
+	// Check if the file exists and is within the old_logs directory
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		log.Printf("Log file not found: %s", filePath)
+		http.Error(w, "Log file not found", http.StatusNotFound)
+		return
+	}
+
+	// Serve the log file
+	appstatus.EmitInfo("logs", fmt.Sprintf("Serving previous log file: %s", fileName))
+	http.ServeFile(w, r, filePath)
+}
+
+func CurrentLogsHandler(w http.ResponseWriter, r *http.Request) {
+	// Serve the current app.log file
+	appstatus.EmitInfo("logs", "Serving current log file")
+	http.ServeFile(w, r, config.LogFile)
+}
+
+func PerformerPreviewHandler(w http.ResponseWriter, r *http.Request) {
+	previewPath := strings.TrimPrefix(r.URL.Path, "/performer-previews/") // Updated prefix
+	if previewPath == "" {
+		http.Error(w, "Preview path not specified", http.StatusBadRequest)
+		return
+	}
+
+	fullPath := filepath.Join(config.PerformerFoldersDir, previewPath)
+
+	// Normalize paths for consistent comparison
+	normalizedFullPath := filepath.ToSlash(fullPath)
+	normalizedPerformerFoldersDir := filepath.ToSlash(config.PerformerFoldersDir)
+
+	// Security check: ensure the path is within the performerFoldersDir
+	if !strings.HasPrefix(normalizedFullPath, normalizedPerformerFoldersDir) {
+		http.Error(w, "Access denied", http.StatusForbidden)
+		return
+	}
+
+	appstatus.EmitInfo("thumbnails", fmt.Sprintf("Serving performer preview: %s", previewPath))
+	http.ServeFile(w, r, fullPath)
+}
+
+func RefetchAllPerformerMetadataHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	go func() {
+		appstatus.EmitInfo("metadata", "Refetch all performer metadata task started")
+		performers, err := database.GetAllPerformerNames()
+		if err != nil {
+			log.Printf("Failed to get all performer names for metadata refetch: %v", err)
+			return
 		}
-		
-		func PreviousLogsHandler(w http.ResponseWriter, r *http.Request) {
-			files, err := os.ReadDir(config.OldLogsDir)
-			if err != nil {
-				log.Println("Failed to read old logs directory:", err)
-				http.Error(w, "Failed to read old logs directory", http.StatusInternalServerError)
-				return
-			}
-		
-			var logFiles []string
-			for _, file := range files {
-				if !file.IsDir() {
-					logFiles = append(logFiles, file.Name())
-				}
-			}
-		
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(logFiles)
-		}
-		
-		func PreviousLogFileHandler(w http.ResponseWriter, r *http.Request) {
-			fileName := strings.TrimPrefix(r.URL.Path, "/api/logs/previous/")
-			if fileName == "" {
-				log.Println("Log file name not specified in request")
-				http.Error(w, "Log file name not specified", http.StatusBadRequest)
-				return
-			}
-		
-			filePath := filepath.Join(config.OldLogsDir, fileName)
-		
-			// Check if the file exists and is within the old_logs directory
-			if _, err := os.Stat(filePath); os.IsNotExist(err) {
-				log.Printf("Log file not found: %s", filePath)
-				http.Error(w, "Log file not found", http.StatusNotFound)
-				return
-			}
-		
-			// Serve the log file
-			http.ServeFile(w, r, filePath)
-		}
-		
-		func CurrentLogsHandler(w http.ResponseWriter, r *http.Request) {
-			// Serve the current app.log file
-			http.ServeFile(w, r, config.LogFile)
-		}
-		
-		func PerformerPreviewHandler(w http.ResponseWriter, r *http.Request) {
-			previewPath := strings.TrimPrefix(r.URL.Path, "/performer-previews/") // Updated prefix
-			if previewPath == "" {
-				http.Error(w, "Preview path not specified", http.StatusBadRequest)
-				return
-			}
-		
-			fullPath := filepath.Join(config.PerformerFoldersDir, previewPath)
-		
-			// Normalize paths for consistent comparison
-			normalizedFullPath := filepath.ToSlash(fullPath)
-			normalizedPerformerFoldersDir := filepath.ToSlash(config.PerformerFoldersDir)
-		
-			// Security check: ensure the path is within the performerFoldersDir
-			if !strings.HasPrefix(normalizedFullPath, normalizedPerformerFoldersDir) {
-				http.Error(w, "Access denied", http.StatusForbidden)
-				return
-			}
-		
-			http.ServeFile(w, r, fullPath)
-		}
-		
-		func RefetchAllPerformerMetadataHandler(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodPost {
-				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-				return
-			}
-		
-			go func() {
-				log.Println("Starting task to refetch all performer metadata...")
-				performers, err := database.GetAllPerformerNames()
+
+		var wg sync.WaitGroup
+		for _, pName := range performers {
+			wg.Add(1)
+			go func(name string) {
+				defer wg.Done()
+				log.Printf("Refetching metadata for %s", name)
+				// Fetch performer data from Adultdatalink API
+				performerDataBytes, err := performer.FetchPerformerData(name)
 				if err != nil {
-					log.Printf("Failed to get all performer names for metadata refetch: %v", err)
+					log.Printf("Failed to fetch data for performer %s from Adultdatalink API: %v", name, err)
 					return
 				}
-		
-				var wg sync.WaitGroup
-				for _, pName := range performers {
-					wg.Add(1)
-					go func(name string) {
-						defer wg.Done()
-						log.Printf("Refetching metadata for %s", name)
-						// Fetch performer data from Adultdatalink API
-						performerDataBytes, err := performer.FetchPerformerData(name)
-						if err != nil {
-							log.Printf("Failed to fetch data for performer %s from Adultdatalink API: %v", name, err)
-							return
-						}
-		
-						var rawAPIResponse map[string]interface{}
-						if err := json.Unmarshal(performerDataBytes, &rawAPIResponse); err != nil {
-							log.Printf("Failed to unmarshal raw Adultdatalink API response for %s: %v", name, err)
-							return
-						}
-		
-						var performerModel models.Performer
-						var existingPerformerJSON string
-						err = database.GetDB().QueryRow("SELECT data FROM performers WHERE name = ?", name).Scan(&existingPerformerJSON)
-						if err != nil {
-							log.Printf("Failed to query existing data for performer %s: %v", name, err)
-							return
-						}
-						if err := json.Unmarshal([]byte(existingPerformerJSON), &performerModel); err != nil {
-							log.Printf("Failed to unmarshal existing data for performer %s: %v", name, err)
-							return
-						}
-		
-						performer.PopulatePerformerFromAPIResponse(&performerModel, rawAPIResponse)
-		
-						updatedPerformerJSON, err := json.Marshal(performerModel)
-						if err != nil {
-							log.Printf("Failed to marshal updated performer %s to JSON: %v", name, err)
-							return
-						}
-		
-						_, err = database.GetDB().Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), name)
-						if err != nil {
-							log.Printf("Failed to update performer %s in database: %v", name, err)
-							return
-						}
-						log.Printf("Successfully refetched and updated metadata for %s.", name)
-					}(pName)
+
+				var rawAPIResponse map[string]interface{}
+				if err := json.Unmarshal(performerDataBytes, &rawAPIResponse); err != nil {
+					log.Printf("Failed to unmarshal raw Adultdatalink API response for %s: %v", name, err)
+					return
 				}
-				wg.Wait()
-				log.Println("Finished refetching all performer metadata.")
-			}()
-		
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]string{"message": "Task to refetch all performer metadata started."})
+
+				var performerModel models.Performer
+				var existingPerformerJSON string
+				err = database.GetDB().QueryRow("SELECT data FROM performers WHERE name = ?", name).Scan(&existingPerformerJSON)
+				if err != nil {
+					log.Printf("Failed to query existing data for performer %s: %v", name, err)
+					return
+				}
+				if err := json.Unmarshal([]byte(existingPerformerJSON), &performerModel); err != nil {
+					log.Printf("Failed to unmarshal existing data for performer %s: %v", name, err)
+					return
+				}
+
+				performer.PopulatePerformerFromAPIResponse(&performerModel, rawAPIResponse)
+
+				updatedPerformerJSON, err := json.Marshal(performerModel)
+				if err != nil {
+					log.Printf("Failed to marshal updated performer %s to JSON: %v", name, err)
+					return
+				}
+
+				_, err = database.GetDB().Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), name)
+				if err != nil {
+					log.Printf("Failed to update performer %s in database: %v", name, err)
+					return
+				}
+				log.Printf("Successfully refetched and updated metadata for %s.", name)
+			}(pName)
 		}
+		wg.Wait()
+		appstatus.EmitInfo("metadata", "Refetch all performer metadata task finished")
+	}()
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Task to refetch all performer metadata started."})
+}
+
+// MonitorEmitHandler allows posting a simple test event (useful for debugging)
+func MonitorEmitHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var payload struct {
+		Message  string `json:"message"`
+		Category string `json:"category"`
+		Level    string `json:"level"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if strings.ToLower(payload.Level) == "error" {
+		appstatus.EmitError(payload.Category, payload.Message)
+	} else {
+		appstatus.EmitInfo(payload.Category, payload.Message)
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// MonitorEventsHandler returns persisted monitor events from the database.
+// Supports optional query params: limit (int), since (unix ms), category, level
+func MonitorEventsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	q := r.URL.Query()
+	limitStr := q.Get("limit")
+	limit := 100
+	if limitStr != "" {
+		if v, err := strconv.Atoi(limitStr); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	sinceStr := q.Get("since")
+	var whereClauses []string
+	var args []interface{}
+	if sinceStr != "" {
+		if v, err := strconv.ParseInt(sinceStr, 10, 64); err == nil {
+			whereClauses = append(whereClauses, "timestamp >= ?")
+			args = append(args, v)
+		}
+	}
+	category := q.Get("category")
+	if category != "" {
+		whereClauses = append(whereClauses, "category = ?")
+		args = append(args, category)
+	}
+	level := q.Get("level")
+	if level != "" {
+		whereClauses = append(whereClauses, "level = ?")
+		args = append(args, level)
+	}
+	where := ""
+	if len(whereClauses) > 0 {
+		where = "WHERE " + strings.Join(whereClauses, " AND ")
+	}
+	query := fmt.Sprintf("SELECT id, type, category, message, level, timestamp FROM monitor_events %s ORDER BY timestamp DESC LIMIT ?", where)
+	args = append(args, limit)
+	rows, err := database.GetDB().Query(query, args...)
+	if err != nil {
+		log.Printf("Failed to query monitor events: %v", err)
+		http.Error(w, "Failed to retrieve events", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	type evt struct {
+		ID        int64  `json:"id"`
+		Type      string `json:"type"`
+		Category  string `json:"category"`
+		Message   string `json:"message"`
+		Level     string `json:"level"`
+		Timestamp int64  `json:"timestamp"`
+	}
+	var out []evt
+	for rows.Next() {
+		var e evt
+		if err := rows.Scan(&e.ID, &e.Type, &e.Category, &e.Message, &e.Level, &e.Timestamp); err != nil {
+			log.Printf("Failed to scan monitor event row: %v", err)
+			continue
+		}
+		out = append(out, e)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(out)
+}
+
+// MonitorSettingsHandler allows reading and writing persisted monitor settings.
+// GET returns all settings as a JSON object. POST/PUT accepts a JSON object of key->value pairs to store.
+func MonitorSettingsHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		rows, err := database.GetDB().Query("SELECT key, value FROM monitor_settings")
+		if err != nil {
+			log.Printf("Failed to query monitor settings: %v", err)
+			http.Error(w, "Failed to retrieve settings", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+		settings := map[string]string{}
+		for rows.Next() {
+			var k, v string
+			if err := rows.Scan(&k, &v); err != nil {
+				log.Printf("Failed to scan monitor_settings row: %v", err)
+				continue
+			}
+			settings[k] = v
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(settings)
+		return
+	case http.MethodPost, http.MethodPut:
+		var payload map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		tx, err := database.GetDB().Begin()
+		if err != nil {
+			log.Printf("Failed to begin tx for monitor settings: %v", err)
+			http.Error(w, "Failed to save settings", http.StatusInternalServerError)
+			return
+		}
+		for k, v := range payload {
+			valStr := fmt.Sprintf("%v", v)
+			if _, err := tx.Exec("INSERT OR REPLACE INTO monitor_settings(key, value) VALUES(?, ?)", k, valStr); err != nil {
+				log.Printf("Failed to upsert monitor setting %s: %v", k, err)
+				tx.Rollback()
+				http.Error(w, "Failed to save settings", http.StatusInternalServerError)
+				return
+			}
+		}
+		if err := tx.Commit(); err != nil {
+			log.Printf("Failed to commit monitor settings tx: %v", err)
+			http.Error(w, "Failed to save settings", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+		return
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+}

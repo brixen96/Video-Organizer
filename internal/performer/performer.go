@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 
+	"video-organizer/internal/appstatus"
 	"video-organizer/internal/config"
 	"video-organizer/internal/database"
 	"video-organizer/internal/models"
@@ -198,88 +199,117 @@ func PopulatePerformerFromAPIResponse(performer *models.Performer, rawAPIRespons
 }
 
 func UpdateExistingPerformersSchema() {
-	log.Println("Updating existing performer schema in database...")
+	appstatus.EmitInfo("[Task]", "Starting performer schema update")
 
 	rows, err := database.GetDB().Query("SELECT name, data FROM performers")
 	if err != nil {
-		log.Printf("Failed to query existing performers for schema update: %v", err)
+		msg := fmt.Sprintf("Failed to query performers: %v", err)
+		appstatus.EmitError("[Error]", msg)
+		log.Printf(msg)
 		return
 	}
 	defer rows.Close()
 
+	// Get total count first for progress tracking
+	var totalCount int
+	err = database.GetDB().QueryRow("SELECT COUNT(*) FROM performers").Scan(&totalCount)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to get total performer count: %v", err)
+		appstatus.EmitError("[Error]", msg)
+		log.Printf(msg)
+		return
+	}
+	appstatus.EmitInfo("[Info]", fmt.Sprintf("Found %d performers to update", totalCount))
+
 	var performersToUpdate []models.Performer
+	processedCount := 0
 
 	for rows.Next() {
+		processedCount++
+		if processedCount%5 == 0 || processedCount == totalCount {
+			appstatus.EmitInfo("[Progress]", fmt.Sprintf("Processing performers: %d/%d", processedCount, totalCount))
+		}
 
 		var name string
-
 		var oldJSON string
 
 		if err := rows.Scan(&name, &oldJSON); err != nil {
-
-			log.Printf("Failed to scan performer data for schema update: %v", err)
-
+			msg := fmt.Sprintf("Failed to read performer data: %v", err)
+			appstatus.EmitError("[Error]", msg)
+			log.Printf(msg)
 			continue
-
 		}
 
 		var oldPerformerMap map[string]interface{}
-
 		if err := json.Unmarshal([]byte(oldJSON), &oldPerformerMap); err != nil {
-
-			log.Printf("Failed to unmarshal old performer JSON for %s: %v", name, err)
-
+			msg := fmt.Sprintf("Failed to parse old data format for %s: %v", name, err)
+			appstatus.EmitError("[Error]", msg)
+			log.Printf(msg)
 			continue
-
 		}
 
 		newPerformer := database.NewDefaultPerformer() // Start with the default template
-
 		newPerformer.Name = name // Keep the existing name
 
 		// Unmarshal old JSON directly into newPerformer to preserve existing fields
-
 		if err := json.Unmarshal([]byte(oldJSON), &newPerformer); err != nil {
-
-			log.Printf("Failed to unmarshal old JSON into newPerformer for %s: %v", name, err)
-
+			msg := fmt.Sprintf("Failed to migrate data for %s: %v", name, err)
+			appstatus.EmitError("[Error]", msg)
+			log.Printf(msg)
 			continue
-
 		}
 
 		newPerformer.Name = name // Ensure name is preserved after unmarshaling
-
 		performersToUpdate = append(performersToUpdate, newPerformer)
-
 	}
 
 	// Update database with new schema
-
-	for _, p := range performersToUpdate {
-		updatedJSON, err := json.Marshal(p)
-		if err != nil {
-			log.Printf("Failed to marshal updated performer %s to JSON: %v", p.Name, err)
-			continue
+	if len(performersToUpdate) > 0 {
+		appstatus.EmitInfo("[Task]", fmt.Sprintf("Saving schema updates for %d performers", len(performersToUpdate)))
+		updatedCount := 0
+		for _, p := range performersToUpdate {
+			updatedJSON, err := json.Marshal(p)
+			if err != nil {
+				msg := fmt.Sprintf("Failed to serialize performer %s: %v", p.Name, err)
+				appstatus.EmitError("[Error]", msg)
+				log.Printf(msg)
+				continue
+			}
+			_, err = database.GetDB().Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedJSON), p.Name)
+			if err != nil {
+				msg := fmt.Sprintf("Failed to save performer %s: %v", p.Name, err)
+				appstatus.EmitError("[Error]", msg)
+				log.Printf(msg)
+				continue
+			}
+			updatedCount++
+			if updatedCount%5 == 0 || updatedCount == len(performersToUpdate) {
+				appstatus.EmitInfo("[Progress]", fmt.Sprintf("Saved schema updates: %d/%d performers", updatedCount, len(performersToUpdate)))
+			}
 		}
-		_, err = database.GetDB().Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedJSON), p.Name)
-		if err != nil {
-			log.Printf("Failed to update performer %s in database: %v", p.Name, err)
-		}
+		appstatus.EmitInfo("[Task]", fmt.Sprintf("Successfully updated schema for %d performers", updatedCount))
+	} else {
+		appstatus.EmitInfo("[Info]", "No schema updates needed")
 	}
-	log.Println("Performer schema update completed.")
+
+	appstatus.EmitInfo("[Task]", "Finished performer schema update")
 }
 
 func AutoAddPerformersFromFolders() {
-	log.Println("Checking for new performers in folders...")
+	appstatus.EmitInfo("[Task]", "Starting scan for new performers in folders")
 	entries, err := os.ReadDir(config.PerformerFoldersDir)
 	if err != nil {
-		log.Printf("Failed to read performer folders directory: %v", err)
+		msg := fmt.Sprintf("Failed to read performer folders directory: %v", err)
+		appstatus.EmitError("[Error]", msg)
+		log.Printf(msg)
 		return
 	}
 
 	existingPerformers, err := database.GetAllPerformerNames()
 	if err != nil {
-		log.Printf("Failed to get existing performer names from DB: %v", err)
+		msg := fmt.Sprintf("Failed to get existing performer names from DB: %v", err)
+		appstatus.EmitError("[Error]", msg)
+		log.Printf(msg)
 		return
 	}
 
@@ -291,6 +321,20 @@ func AutoAddPerformersFromFolders() {
 	var wg sync.WaitGroup
 	newPerformersToInsert := make(chan models.Performer, len(entries)) // Channel to collect new performers
 
+	// Count potential new performers first
+	newPerformerCount := 0
+	for _, entry := range entries {
+		if entry.IsDir() && !existingPerformerMap[entry.Name()] {
+			newPerformerCount++
+		}
+	}
+	if newPerformerCount == 0 {
+		appstatus.EmitInfo("[Info]", "No new performer folders found")
+		return
+	}
+	appstatus.EmitInfo("[Info]", fmt.Sprintf("Found %d new performer folders to process", newPerformerCount))
+
+	processedCount := 0
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -303,44 +347,56 @@ func AutoAddPerformersFromFolders() {
 		wg.Add(1)
 		go func(pName string) {
 			defer wg.Done()
-
-			log.Printf("New performer folder found: %s. Processing concurrently.", pName)
+			processedCount++
+			appstatus.EmitInfo("[Progress]", fmt.Sprintf("Processing new performer: %s (%d/%d)", pName, processedCount, newPerformerCount))
 
 			var performer models.Performer
 			var existingPerformerJSON string
 			err := database.GetDB().QueryRow("SELECT data FROM performers WHERE name = ?", pName).Scan(&existingPerformerJSON)
 			if err != nil && err != sql.ErrNoRows {
-				log.Printf("Error querying existing performer %s from database: %v", pName, err)
+				msg := fmt.Sprintf("Error querying existing performer %s from database: %v", pName, err)
+				appstatus.EmitError("[Error]", msg)
+				log.Printf(msg)
 				return
 			} else if err == sql.ErrNoRows { // Performer does not exist, initialize with default template
 				performer = database.NewDefaultPerformer()
 				performer.Name = pName // Ensure name is set
 			} else { // Performer exists, unmarshal existing data
 				if err := json.Unmarshal([]byte(existingPerformerJSON), &performer); err != nil {
-					log.Printf("Error unmarshaling existing performer %s data: %v", pName, err)
+					msg := fmt.Sprintf("Error parsing existing performer %s data: %v", pName, err)
+					appstatus.EmitError("[Error]", msg)
+					log.Printf(msg)
 					return
 				}
 			}
 
 			// Fetch performer data from Adultdatalink API
+			appstatus.EmitInfo("[Progress]", fmt.Sprintf("Fetching metadata for %s", pName))
 			performerDataBytes, err := FetchPerformerData(pName)
 			if err != nil {
-				log.Printf("Failed to fetch data for performer %s from Adultdatalink API: %v", pName, err)
+				msg := fmt.Sprintf("Failed to fetch data for performer %s from API: %v", pName, err)
+				appstatus.EmitWarning("[Warning]", msg)
+				log.Printf(msg)
 			} else {
 				var rawAPIResponse map[string]interface{}
 				if err := json.Unmarshal(performerDataBytes, &rawAPIResponse); err != nil {
-					log.Printf("Failed to unmarshal raw Adultdatalink API response for %s: %v", pName, err)
+					msg := fmt.Sprintf("Failed to parse API response for %s: %v", pName, err)
+					appstatus.EmitError("[Error]", msg)
+					log.Printf(msg)
 				} else {
 					PopulatePerformerFromAPIResponse(&performer, rawAPIResponse)
-					log.Printf("Successfully fetched Adultdatalink API data for %s.", pName)
+					appstatus.EmitInfo("[Info]", fmt.Sprintf("Successfully fetched metadata for %s", pName))
 				}
 			}
 
 			// Scan for previews (.mkv and image files)
+			appstatus.EmitInfo("[Progress]", fmt.Sprintf("Scanning previews for %s", pName))
 			performerFolderPath := filepath.Join(config.PerformerFoldersDir, pName)
 			performerEntries, err := os.ReadDir(performerFolderPath)
 			if err != nil {
-				log.Printf("Failed to read performer folder %s for previews: %v", performerFolderPath, err)
+				msg := fmt.Sprintf("Failed to read performer folder %s: %v", performerFolderPath, err)
+				appstatus.EmitError("[Error]", msg)
+				log.Printf(msg)
 			} else {
 				var previews []string
 				for _, pEntry := range performerEntries {
@@ -348,14 +404,16 @@ func AutoAddPerformersFromFolders() {
 					if !pEntry.IsDir() && ext == ".mkv" {
 						relativePath, err := filepath.Rel(config.PerformerFoldersDir, filepath.Join(performerFolderPath, pEntry.Name()))
 						if err != nil {
-							log.Printf("Failed to get relative path for preview %s: %v", pEntry.Name(), err)
+							msg := fmt.Sprintf("Failed to get relative path for preview %s: %v", pEntry.Name(), err)
+							appstatus.EmitWarning("[Warning]", msg)
+							log.Printf(msg)
 							continue
 						}
 						previews = append(previews, filepath.ToSlash(relativePath))
 					}
 				}
 				performer.Previews = previews
-				log.Printf("Found %d previews for %s.", len(previews), pName)
+				appstatus.EmitInfo("[Info]", fmt.Sprintf("Found %d previews for %s", len(previews), pName))
 			}
 			newPerformersToInsert <- performer // Send processed performer to channel
 		}(performerName)
@@ -371,87 +429,129 @@ func AutoAddPerformersFromFolders() {
 	}
 
 	if len(performersToBatchInsert) > 0 {
-		log.Printf("Batch inserting %d new performers into database.", len(performersToBatchInsert))
+		appstatus.EmitInfo("[Task]", fmt.Sprintf("Saving %d new performers to database", len(performersToBatchInsert)))
 		tx, err := database.GetDB().Begin()
 		if err != nil {
-			log.Printf("Failed to begin transaction for batch insert: %v", err)
+			msg := fmt.Sprintf("Failed to begin transaction for batch insert: %v", err)
+			appstatus.EmitError("[Error]", msg)
+			log.Printf(msg)
 			return
 		}
 		stmt, err := tx.Prepare("INSERT INTO performers(name, data) VALUES(?, ?)")
 		if err != nil {
-			log.Printf("Failed to prepare statement for batch insert: %v", err)
+			msg := fmt.Sprintf("Failed to prepare statement for batch insert: %v", err)
+			appstatus.EmitError("[Error]", msg)
+			log.Printf(msg)
 			tx.Rollback()
 			return
 		}
 		defer stmt.Close()
 
+		insertedCount := 0
 		for _, p := range performersToBatchInsert {
 			performerJSON, err := json.Marshal(p)
 			if err != nil {
-				log.Printf("Failed to marshal performer %s for batch insert: %v", p.Name, err)
+				msg := fmt.Sprintf("Failed to serialize performer %s: %v", p.Name, err)
+				appstatus.EmitError("[Error]", msg)
+				log.Printf(msg)
 				continue
 			}
 			_, err = stmt.Exec(p.Name, string(performerJSON))
 			if err != nil {
-				log.Printf("Failed to insert performer %s during batch insert: %v", p.Name, err)
+				msg := fmt.Sprintf("Failed to save performer %s: %v", p.Name, err)
+				appstatus.EmitError("[Error]", msg)
+				log.Printf(msg)
 				continue
+			}
+			insertedCount++
+			if insertedCount%5 == 0 || insertedCount == len(performersToBatchInsert) {
+				appstatus.EmitInfo("[Progress]", fmt.Sprintf("Saved %d/%d performers", insertedCount, len(performersToBatchInsert)))
 			}
 		}
 		err = tx.Commit()
 		if err != nil {
-			log.Printf("Failed to commit transaction for batch insert: %v", err)
+			msg := fmt.Sprintf("Failed to commit batch insert: %v", err)
+			appstatus.EmitError("[Error]", msg)
+			log.Printf(msg)
 			return
 		}
-		log.Println("Batch insert of new performers completed.")
+		appstatus.EmitInfo("[Task]", fmt.Sprintf("Successfully added %d new performers", insertedCount))
 	}
 
-	log.Println("Finished checking for new performers.")
+	appstatus.EmitInfo("[Task]", "Finished checking for new performers")
 }
 
 func UpdatePerformerPreviewsTask() {
-	log.Println("Starting update performer previews task...")
+	appstatus.EmitInfo("[Task]", "Starting performer previews update scan")
 
 	rows, err := database.GetDB().Query("SELECT name, data FROM performers")
 	if err != nil {
-		log.Printf("Failed to query performers for preview update: %v", err)
+		msg := fmt.Sprintf("Failed to query performers: %v", err)
+		appstatus.EmitError("[Error]", msg)
+		log.Printf(msg)
 		return
 	}
 	defer rows.Close()
 
+	// Get total count first for progress tracking
+	var totalCount int
+	err = database.GetDB().QueryRow("SELECT COUNT(*) FROM performers").Scan(&totalCount)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to get total performer count: %v", err)
+		appstatus.EmitError("[Error]", msg)
+		log.Printf(msg)
+		return
+	}
+	appstatus.EmitInfo("[Info]", fmt.Sprintf("Found %d performers to scan", totalCount))
+
 	var wg sync.WaitGroup
 	performersToUpdate := make(chan models.Performer, 100) // Buffer channel
 
+	processedCount := 0
 	for rows.Next() {
 		var name string
 		var performerJSON string
 		if err := rows.Scan(&name, &performerJSON); err != nil {
-			log.Printf("Failed to scan performer data for preview update: %v", err)
+			msg := fmt.Sprintf("Failed to read performer data: %v", err)
+			appstatus.EmitError("[Error]", msg)
+			log.Printf(msg)
 			continue
 		}
 
 		var performer models.Performer
 		if err := json.Unmarshal([]byte(performerJSON), &performer); err != nil {
-			log.Printf("Failed to unmarshal performer JSON for %s: %v", name, err)
+			msg := fmt.Sprintf("Failed to parse performer data for %s: %v", name, err)
+			appstatus.EmitError("[Error]", msg)
+			log.Printf(msg)
 			continue
 		}
 
 		wg.Add(1)
 		go func(p models.Performer) {
 			defer wg.Done()
+			processedCount++
+
+			if processedCount%5 == 0 || processedCount == totalCount {
+				appstatus.EmitInfo("[Progress]", fmt.Sprintf("Scanning performer previews: %d/%d", processedCount, totalCount))
+			}
 
 			performerFolderPath := filepath.Join(config.PerformerFoldersDir, p.Name)
 			currentPreviews := []string{}
 
 			performerEntries, err := os.ReadDir(performerFolderPath)
 			if err != nil {
-				log.Printf("Failed to read performer folder %s for previews: %v", performerFolderPath, err)
+				msg := fmt.Sprintf("Failed to scan folder %s: %v", performerFolderPath, err)
+				appstatus.EmitWarning("[Warning]", msg)
+				log.Printf(msg)
 			} else {
 				for _, entry := range performerEntries {
 					ext := strings.ToLower(filepath.Ext(entry.Name()))
 					if !entry.IsDir() && ext == ".mkv" {
 						relativePath, err := filepath.Rel(config.PerformerFoldersDir, filepath.Join(performerFolderPath, entry.Name()))
 						if err != nil {
-							log.Printf("Failed to get relative path for preview %s: %v", entry.Name(), err)
+							msg := fmt.Sprintf("Failed to process preview %s: %v", entry.Name(), err)
+							appstatus.EmitWarning("[Warning]", msg)
+							log.Printf(msg)
 							continue
 						}
 						currentPreviews = append(currentPreviews, filepath.ToSlash(relativePath))
@@ -461,10 +561,11 @@ func UpdatePerformerPreviewsTask() {
 
 			// Compare current previews with stored previews
 			if !CompareStringSlices(p.Previews, currentPreviews) {
-				log.Printf("Previews changed for %s. Updating...", p.Name)
+				appstatus.EmitInfo("[Info]", fmt.Sprintf("Updating previews for %s", p.Name))
 				p.Previews = currentPreviews
 				// If default preview is no longer valid, clear it
 				if p.DefaultPreview != "" && !ContainsString(currentPreviews, p.DefaultPreview) {
+					appstatus.EmitWarning("[Warning]", fmt.Sprintf("Default preview for %s is no longer valid, clearing", p.Name))
 					p.DefaultPreview = ""
 				}
 				performersToUpdate <- p
@@ -475,19 +576,42 @@ func UpdatePerformerPreviewsTask() {
 	wg.Wait()
 	close(performersToUpdate)
 
-	// Batch update database
+	// Count performers that need updates
+	var performersToBatchUpdate []models.Performer
 	for p := range performersToUpdate {
-		updatedJSON, err := json.Marshal(p)
-		if err != nil {
-			log.Printf("Failed to marshal updated performer %s to JSON: %v", p.Name, err)
-			continue
-		}
-		_, err = database.GetDB().Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedJSON), p.Name)
-		if err != nil {
-			log.Printf("Failed to update performer %s in database: %v", p.Name, err)
-		}
+		performersToBatchUpdate = append(performersToBatchUpdate, p)
 	}
-	log.Println("Update performer previews task completed.")
+
+	if len(performersToBatchUpdate) > 0 {
+		appstatus.EmitInfo("[Task]", fmt.Sprintf("Saving preview updates for %d performers", len(performersToBatchUpdate)))
+
+		updatedCount := 0
+		for _, p := range performersToBatchUpdate {
+			updatedJSON, err := json.Marshal(p)
+			if err != nil {
+				msg := fmt.Sprintf("Failed to serialize performer %s: %v", p.Name, err)
+				appstatus.EmitError("[Error]", msg)
+				log.Printf(msg)
+				continue
+			}
+			_, err = database.GetDB().Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedJSON), p.Name)
+			if err != nil {
+				msg := fmt.Sprintf("Failed to save performer %s: %v", p.Name, err)
+				appstatus.EmitError("[Error]", msg)
+				log.Printf(msg)
+				continue
+			}
+			updatedCount++
+			if updatedCount%5 == 0 || updatedCount == len(performersToBatchUpdate) {
+				appstatus.EmitInfo("[Progress]", fmt.Sprintf("Saved preview updates: %d/%d performers", updatedCount, len(performersToBatchUpdate)))
+			}
+		}
+		appstatus.EmitInfo("[Task]", fmt.Sprintf("Successfully updated previews for %d performers", updatedCount))
+	} else {
+		appstatus.EmitInfo("[Info]", "No preview updates needed")
+	}
+
+	appstatus.EmitInfo("[Task]", "Finished performer previews update scan")
 }
 
 func CompareStringSlices(a, b []string) bool {

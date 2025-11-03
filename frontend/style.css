@@ -59,6 +59,10 @@ body {
 	display: flex;
 }
 
+.navbar .nav-center {
+	margin-right: 15vw;
+}
+
 .navbar .nav-list li {
 	margin-left: 1.5rem;
 }
@@ -398,6 +402,231 @@ body {
 .library-row:hover {
 	background: #222;
 	box-shadow: 0 2px 8px rgba(0, 170, 255, 0.08);
+}
+
+/* Activity Monitor UI */
+.activity-monitor-container {
+	position: relative;
+	display: inline-block;
+	margin-left: 0.5rem;
+}
+.activity-monitor-container button#activity-monitor-button {
+	background: transparent;
+	color: #fff;
+	border: 1px solid #333;
+	padding: 6px 8px;
+	border-radius: 6px;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.monitor-status-text {
+	/* absolutely positioned status so it doesn't change navbar layout */
+	position: absolute;
+	left: calc(100% + 8px);
+	top: 50%;
+	transform: translateY(-50%);
+	color: #cbd5e1;
+	font-size: 0.95rem;
+	pointer-events: none;
+	max-width: 420px; /* allow longer messages before truncation */
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.monitor-indicator {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	display: inline-block;
+	vertical-align: middle;
+}
+.monitor-green {
+	background: #24c36b;
+	box-shadow: 0 0 6px rgba(36, 195, 107, 0.18);
+}
+.monitor-yellow {
+	background: #ffd166;
+	box-shadow: 0 0 6px rgba(255, 209, 102, 0.12);
+}
+.monitor-red {
+	background: #ff6b6b;
+	box-shadow: 0 0 8px rgba(255, 107, 107, 0.18);
+}
+
+.activity-monitor-panel {
+	position: absolute;
+	right: 0;
+	top: 42px;
+	width: 380px;
+	max-height: 420px;
+	background: #141414;
+	border: 1px solid #333;
+	box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+	color: #fff;
+	border-radius: 8px;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	z-index: 2002;
+}
+.activity-monitor-panel.hidden {
+	display: none;
+}
+.activity-monitor-header {
+	padding: 10px 12px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	border-bottom: 1px solid #222;
+	background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent);
+}
+.activity-monitor-actions button {
+	background: #222;
+	color: #fff;
+	border: 1px solid #333;
+	padding: 6px 8px;
+	margin-left: 6px;
+	border-radius: 6px;
+	cursor: pointer;
+}
+.activity-monitor-filters {
+	padding: 8px 10px;
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+.monitor-panel-status {
+	padding: 8px 12px;
+	color: #bfc7d6;
+	font-size: 0.9rem;
+	border-bottom: 1px solid #151515;
+}
+.activity-monitor-filter-badge {
+	background: #1b1b1b;
+	border: 1px solid #2b2b2b;
+	padding: 4px 8px;
+	border-radius: 12px;
+	font-size: 0.85rem;
+	cursor: pointer;
+}
+.activity-monitor-list {
+	list-style: none;
+	padding: 8px;
+	margin: 0;
+	overflow-y: auto;
+	flex-grow: 1;
+}
+.activity-monitor-list li {
+	padding: 8px;
+	border-bottom: 1px solid #1a1a1a;
+	font-size: 0.9rem;
+}
+.activity-monitor-list li .meta {
+	color: #9aa;
+	font-size: 0.75rem;
+}
+
+/* Monitor message category styles */
+.activity-monitor-list li[data-category='Task'] {
+	color: #4dc9ff; /* Light blue for tasks */
+}
+
+.activity-monitor-list li[data-category='Progress'] {
+	color: #24c36b; /* Green for progress */
+}
+
+.activity-monitor-list li[data-category='Info'] {
+	color: #ffd166; /* Yellow for info */
+}
+
+.activity-monitor-list li[data-category='Warning'] {
+	color: #ff9f1a; /* Orange for warnings */
+}
+
+.activity-monitor-list li[data-category='Error'] {
+	color: #ff6b6b; /* Red for errors */
+}
+
+.monitor-empty {
+	color: #8b8b8b;
+	font-style: italic;
+	padding: 12px;
+}
+
+/* Monitor Settings in Interface tab */
+.monitor-settings {
+	background: #151515;
+	padding: 12px;
+	border-radius: 8px;
+	border: 1px solid #222;
+}
+.monitor-toggle-group {
+	display: flex;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin: 8px 0;
+}
+.monitor-toggle-actions {
+	margin-top: 10px;
+}
+.monitor-toggle-actions button {
+	margin-right: 8px;
+}
+
+/* Copy tooltip */
+.copy-tooltip {
+	position: fixed;
+	background: rgba(0, 0, 0, 0.8);
+	color: white;
+	padding: 4px 8px;
+	border-radius: 4px;
+	font-size: 12px;
+	pointer-events: none;
+	animation: fadeInOut 1.5s ease forwards;
+	z-index: 9999;
+}
+
+@keyframes fadeInOut {
+	0% {
+		opacity: 0;
+		transform: translateY(5px);
+	}
+	10% {
+		opacity: 1;
+		transform: translateY(0);
+	}
+	90% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+
+/* Cursor styles for clickable messages */
+.activity-monitor-list li .msg {
+	cursor: pointer;
+}
+.activity-monitor-list li .msg:hover {
+	text-decoration: underline;
+}
+
+/* tiny pulse animation when new event arrives */
+.pulse {
+	animation: monitor-pulse 0.6s ease;
+}
+@keyframes monitor-pulse {
+	0% {
+		transform: scale(1);
+	}
+	50% {
+		transform: scale(1.06);
+	}
+	100% {
+		transform: scale(1);
+	}
 }
 .default-icon {
 	color: #ffd700;
