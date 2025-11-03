@@ -1,0 +1,707 @@
+package handlers
+
+import (
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+
+	"video-organizer/internal/config"
+	"video-organizer/internal/database"
+	"video-organizer/internal/models"
+	"video-organizer/internal/performer"
+	"video-organizer/internal/video"
+)
+
+func VideosHandler(w http.ResponseWriter, r *http.Request) {
+	var videos []models.VideoInfo
+	for _, v := range video.GetVideoCache() {
+		videos = append(videos, v)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(videos)
+}
+
+func RenameHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		log.Println("Invalid method for RenameHandler:", r.Method)
+		http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req models.RenameRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Println("Invalid request body for RenameHandler:", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Rename video file
+	oldVideoPath := filepath.Join(config.VideoDir, req.OldName)
+	newVideoPath := filepath.Join(config.VideoDir, req.NewName)
+	if err := os.Rename(oldVideoPath, newVideoPath); err != nil {
+		log.Println("Failed to rename video", req.OldName, ":", err)
+		http.Error(w, fmt.Sprintf("Failed to rename video: %v", err), http.StatusInternalServerError)
+		return
+	}
+	log.Println("Successfully renamed video from", req.OldName, "to", req.NewName)
+
+	// Rename thumbnail file
+	oldThumbName := fmt.Sprintf("%s.jpg", strings.TrimSuffix(req.OldName, filepath.Ext(req.OldName)))
+	newThumbName := fmt.Sprintf("%s.jpg", strings.TrimSuffix(req.NewName, filepath.Ext(req.NewName)))
+	oldThumbPath := filepath.Join(config.ThumbnailDir, oldThumbName)
+	newThumbPath := filepath.Join(config.ThumbnailDir, newThumbName)
+	if _, err := os.Stat(oldThumbPath); err == nil {
+		if err := os.Rename(oldThumbPath, newThumbPath); err != nil {
+			log.Println("Failed to rename thumbnail for", req.OldName, ":", err)
+		}
+	}
+
+	// Update cache
+	delete(video.GetVideoCache(), req.OldName)
+
+	performerNames, err := database.GetAllPerformerNames()
+	if err != nil {
+		log.Printf("Failed to get performer names for rename handler: %v", err)
+		http.Error(w, "Failed to update performer associations", http.StatusInternalServerError)
+		return
+	}
+
+	video.GetVideoCache()[req.NewName] = video.GenerateVideoInfo(req.NewName, newVideoPath, performerNames)
+
+	// Re-evaluate and update performer scene counts
+	video.UpdatePerformerSceneCounts()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
+func ChatHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		log.Println("Invalid method for ChatHandler:", r.Method)
+		http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var msg models.ChatMessage
+	if err := json.NewDecoder(r.Body).Decode(&msg); err != nil {
+		log.Println("Invalid request body for ChatHandler:", err)
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Basic AI response logic
+	reply := "I am a simple AI. I don't have much to say yet."
+	if strings.Contains(strings.ToLower(msg.Message), "hello") {
+		reply = "Hello there! How can I help you?"
+	} else if strings.Contains(strings.ToLower(msg.Message), "naming convention") {
+		reply = "A good naming convention is `YYYY-MM-DD_Event-Name.mp4`. This helps with sorting and identification."
+	}
+	log.Println("Chat message from user:", msg.Message, "; AI reply:", reply)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"reply": reply})
+}
+
+func PerformersHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		var performer models.Performer
+		if err := json.NewDecoder(r.Body).Decode(&performer); err != nil {
+			log.Println("Invalid request body for addPerformer:", err)
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		performerJSON, err := json.Marshal(performer)
+		if err != nil {
+			log.Println("Failed to marshal performer to JSON:", err)
+			http.Error(w, "Failed to process performer data", http.StatusInternalServerError)
+			return
+		}
+
+		_, err = database.GetDB().Exec("INSERT INTO performers(name, data) VALUES(?, ?)", performer.Name, string(performerJSON))
+		if err != nil {
+			log.Println("Failed to insert performer into database:", err)
+			http.Error(w, "Failed to add performer", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Performer added successfully"})
+
+	case http.MethodGet:
+
+		rows, err := database.GetDB().Query("SELECT data FROM performers")
+		if err != nil {
+			log.Println("Failed to query performers from database:", err)
+			http.Error(w, "Failed to retrieve performers", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var performers []models.Performer
+		for rows.Next() {
+			var performerJSON string
+			if err := rows.Scan(&performerJSON); err != nil {
+				log.Println("Failed to scan performer data:", err)
+				continue
+			}
+			var performer models.Performer
+			if err := json.Unmarshal([]byte(performerJSON), &performer); err != nil {
+				log.Println("Failed to unmarshal performer JSON:", err)
+				continue
+			}
+			performers = append(performers, performer)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(performers)
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func PerformerDetailsHandler(w http.ResponseWriter, r *http.Request) {
+	var err error
+	performerName := strings.TrimPrefix(r.URL.Path, "/api/performers/")
+
+	// Handle set-default-preview action
+	if strings.HasSuffix(performerName, "/set-default-preview") {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		performerName = strings.TrimSuffix(performerName, "/set-default-preview")
+		if performerName == "" {
+			http.Error(w, "Performer name not specified", http.StatusBadRequest)
+			return
+		}
+
+		var payload struct {
+			PreviewURL string `json:"previewUrl"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		var performerJSON string
+		err = database.GetDB().QueryRow("SELECT data FROM performers WHERE name = ?", performerName).Scan(&performerJSON)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Performer not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			log.Printf("Failed to query performer %s from database: %v", performerName, err)
+			http.Error(w, "Failed to retrieve performer details", http.StatusInternalServerError)
+			return
+		}
+
+		var p models.Performer
+		if err = json.Unmarshal([]byte(performerJSON), &p); err != nil {
+			log.Printf("Failed to unmarshal performer JSON for %s: %v", performerName, err)
+			http.Error(w, "Failed to process performer data", http.StatusInternalServerError)
+			return
+		}
+
+		p.DefaultPreview = payload.PreviewURL
+		updatedPerformerJSON, err := json.Marshal(p)
+		if err != nil {
+			log.Printf("Failed to marshal updated performer %s to JSON: %v", performerName, err)
+			http.Error(w, "Failed to update performer data", http.StatusInternalServerError)
+			return
+		}
+
+		_, err = database.GetDB().Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), performerName)
+		if err != nil {
+			log.Printf("Failed to update performer %s in database: %v", performerName, err)
+			http.Error(w, "Failed to save default preview", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Default preview updated successfully"})
+		return
+	}
+
+	// Handle set-zoo action
+	if strings.HasSuffix(performerName, "/set-zoo") {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		performerName = strings.TrimSuffix(performerName, "/set-zoo")
+		if performerName == "" {
+			http.Error(w, "Performer name not specified", http.StatusBadRequest)
+			return
+		}
+
+		var payload struct {
+			Zoo string `json:"zoo"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		var performerJSON string
+		err = database.GetDB().QueryRow("SELECT data FROM performers WHERE name = ?", performerName).Scan(&performerJSON)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Performer not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			log.Printf("Failed to query performer %s from database: %v", performerName, err)
+			http.Error(w, "Failed to retrieve performer details", http.StatusInternalServerError)
+			return
+		}
+
+		var performer models.Performer
+		if err = json.Unmarshal([]byte(performerJSON), &performer); err != nil {
+			log.Printf("Failed to unmarshal performer JSON for %s: %v", performerName, err)
+			http.Error(w, "Failed to process performer data", http.StatusInternalServerError)
+			return
+		}
+
+		performer.Zoo = payload.Zoo
+		updatedPerformerJSON, err := json.Marshal(performer)
+		if err != nil {
+			log.Printf("Failed to marshal updated performer %s to JSON: %v", performerName, err)
+			http.Error(w, "Failed to update performer data", http.StatusInternalServerError)
+			return
+		}
+
+		_, err = database.GetDB().Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), performerName)
+		if err != nil {
+			log.Printf("ERROR: Failed to update performer %s in database for set-zoo: %v", performerName, err)
+			http.Error(w, "Failed to save zoo status", http.StatusInternalServerError)
+			return
+		}
+		log.Printf("DEBUG: Successfully updated zoo status for %s in database.", performerName)
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Zoo status updated successfully"})
+		return
+	}
+
+	// Handle reset-metadata action
+	if strings.HasSuffix(performerName, "/reset-metadata") {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		performerName = strings.TrimSuffix(performerName, "/reset-metadata")
+		if performerName == "" {
+			http.Error(w, "Performer name not specified", http.StatusBadRequest)
+			return
+		}
+
+		var performerJSON string
+		err = database.GetDB().QueryRow("SELECT data FROM performers WHERE name = ?", performerName).Scan(&performerJSON)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Performer not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			log.Printf("Failed to query performer %s from database: %v", performerName, err)
+			http.Error(w, "Failed to retrieve performer details", http.StatusInternalServerError)
+			return
+		}
+
+		var existingPerformer models.Performer
+		if err := json.Unmarshal([]byte(performerJSON), &existingPerformer); err != nil {
+			log.Printf("Failed to unmarshal performer JSON for %s: %v", performerName, err)
+			http.Error(w, "Failed to process performer data", http.StatusInternalServerError)
+			return
+		}
+
+		newPerformer := database.NewDefaultPerformer()
+		newPerformer.Name = existingPerformer.Name
+		newPerformer.Zoo = existingPerformer.Zoo
+		newPerformer.Previews = existingPerformer.Previews
+		newPerformer.DefaultPreview = existingPerformer.DefaultPreview
+
+		if newPerformer.Zoo == "true" {
+			newPerformer.Profession = "Bestiality"
+		}
+
+		updatedPerformerJSON, err := json.Marshal(newPerformer)
+		if err != nil {
+			log.Printf("Failed to marshal updated performer %s to JSON: %v", performerName, err)
+			http.Error(w, "Failed to update performer data", http.StatusInternalServerError)
+			return
+		}
+
+		_, err = database.GetDB().Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), performerName)
+		if err != nil {
+			log.Printf("Failed to update performer %s in database: %v", performerName, err)
+			http.Error(w, "Failed to reset metadata", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Metadata reset successfully"})
+		return
+	}
+
+	// Handle reset-previews action
+	if strings.HasSuffix(performerName, "/reset-previews") {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		performerName = strings.TrimSuffix(performerName, "/reset-previews")
+		if performerName == "" {
+			http.Error(w, "Performer name not specified", http.StatusBadRequest)
+			return
+		}
+
+		// Scan for previews
+		performerFolderPath := filepath.Join(config.PerformerFoldersDir, performerName)
+		performerEntries, err := os.ReadDir(performerFolderPath)
+		if err != nil {
+			log.Printf("Failed to read performer folder %s for previews: %v", performerFolderPath, err)
+			http.Error(w, "Failed to read performer folder", http.StatusInternalServerError)
+			return
+		}
+
+		var previews []string
+		for _, pEntry := range performerEntries {
+			ext := strings.ToLower(filepath.Ext(pEntry.Name()))
+			if !pEntry.IsDir() && ext == ".mkv" {
+				relativePath, err := filepath.Rel(config.PerformerFoldersDir, filepath.Join(performerFolderPath, pEntry.Name()))
+				if err != nil {
+					log.Printf("Failed to get relative path for preview %s: %v", pEntry.Name(), err)
+					continue
+				}
+				previews = append(previews, filepath.ToSlash(relativePath))
+			}
+		}
+
+		var performerJSON string
+		err = database.GetDB().QueryRow("SELECT data FROM performers WHERE name = ?", performerName).Scan(&performerJSON)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Performer not found", http.StatusNotFound)
+			return
+		} else if err != nil {
+			log.Printf("Failed to query performer %s from database: %v", performerName, err)
+			http.Error(w, "Failed to retrieve performer details", http.StatusInternalServerError)
+			return
+		}
+
+		var p models.Performer
+		if err = json.Unmarshal([]byte(performerJSON), &p); err != nil {
+			log.Printf("Failed to unmarshal performer JSON for %s: %v", performerName, err)
+			http.Error(w, "Failed to process performer data", http.StatusInternalServerError)
+			return
+		}
+
+		p.Previews = previews
+		if p.DefaultPreview != "" && !performer.ContainsString(previews, p.DefaultPreview) {
+			p.DefaultPreview = ""
+		}
+
+		updatedPerformerJSON, err := json.Marshal(p)
+		if err != nil {
+			log.Printf("Failed to marshal updated performer %s to JSON: %v", performerName, err)
+			http.Error(w, "Failed to update performer data", http.StatusInternalServerError)
+			return
+		}
+
+		_, err = database.GetDB().Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), performerName)
+		if err != nil {
+			log.Printf("Failed to update performer %s in database: %v", performerName, err)
+			http.Error(w, "Failed to reset previews", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Previews reset successfully"})
+		return
+	}
+
+	// Handle fetch-metadata action
+	if strings.HasSuffix(performerName, "/fetch-metadata") {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		trimmedPerformerName := strings.TrimSuffix(performerName, "/fetch-metadata")
+		if trimmedPerformerName == "" {
+			http.Error(w, "Performer name not specified", http.StatusBadRequest)
+			return
+		}
+
+		log.Printf("Fetching metadata for performer: %s", trimmedPerformerName)
+
+		// Fetch performer data from Adultdatalink API
+		performerDataBytes, err := performer.FetchPerformerData(trimmedPerformerName)
+		if err != nil {
+			log.Printf("Failed to fetch data for performer %s from Adultdatalink API: %v", trimmedPerformerName, err)
+			http.Error(w, fmt.Sprintf("Failed to fetch metadata: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		var rawAPIResponse map[string]interface{}
+		if err := json.Unmarshal(performerDataBytes, &rawAPIResponse); err != nil {
+			log.Printf("Failed to unmarshal raw Adultdatalink API response for %s: %v", trimmedPerformerName, err)
+			http.Error(w, "Failed to process API response", http.StatusInternalServerError)
+			return
+		}
+
+		var p models.Performer
+		var existingPerformerJSON string
+		err = database.GetDB().QueryRow("SELECT data FROM performers WHERE name = ?", trimmedPerformerName).Scan(&existingPerformerJSON)
+		if err == sql.ErrNoRows {
+			// Performer not found in DB, create a new one
+			newPerformer := database.NewDefaultPerformer()
+			newPerformer.Name = trimmedPerformerName
+			performer.PopulatePerformerFromAPIResponse(&newPerformer, rawAPIResponse)
+
+			performerJSON, err := json.Marshal(newPerformer)
+			if err != nil {
+				log.Printf("Failed to marshal new performer %s to JSON: %v", trimmedPerformerName, err)
+				http.Error(w, "Failed to process performer data", http.StatusInternalServerError)
+				return
+			}
+			_, err = database.GetDB().Exec("INSERT INTO performers(name, data) VALUES(?, ?)", trimmedPerformerName, string(performerJSON))
+			if err != nil {
+				log.Printf("Failed to insert new performer %s into database: %v", trimmedPerformerName, err)
+				http.Error(w, "Failed to add performer", http.StatusInternalServerError)
+				return
+			}
+			log.Printf("Successfully fetched metadata and added new performer %s.", trimmedPerformerName)
+
+		} else if err != nil {
+			log.Printf("Failed to query performer %s from database: %v", trimmedPerformerName, err)
+			http.Error(w, "Failed to retrieve performer details", http.StatusInternalServerError)
+			return
+		} else {
+			// Performer found, unmarshal existing data and update
+			if err = json.Unmarshal([]byte(existingPerformerJSON), &p); err != nil {
+				log.Printf("Failed to unmarshal existing performer JSON for %s: %v", trimmedPerformerName, err)
+				http.Error(w, "Failed to process performer data", http.StatusInternalServerError)
+				return
+			}
+			performer.PopulatePerformerFromAPIResponse(&p, rawAPIResponse)
+
+			updatedPerformerJSON, err := json.Marshal(p)
+			if err != nil {
+				log.Printf("Failed to marshal updated performer %s to JSON: %v", trimmedPerformerName, err)
+				http.Error(w, "Failed to process performer data", http.StatusInternalServerError)
+				return
+			}
+
+			_, err = database.GetDB().Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), trimmedPerformerName)
+			if err != nil {
+				log.Printf("Failed to update performer %s in database: %v", trimmedPerformerName, err)
+				http.Error(w, "Failed to update performer data in database", http.StatusInternalServerError)
+				return
+			}
+			log.Printf("Successfully fetched and updated metadata for %s.", trimmedPerformerName)
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Metadata fetched and updated successfully"})
+		return
+	}
+
+	// Existing logic for GET performer details
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if performerName == "" {
+		http.Error(w, "Performer name not specified", http.StatusBadRequest)
+		return
+	}
+
+	var performerJSON string
+	err = database.GetDB().QueryRow("SELECT data FROM performers WHERE name = ?", performerName).Scan(&performerJSON)
+	if err == sql.ErrNoRows {
+		http.Error(w, "Performer not found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		log.Println("Failed to query performer from database:", err)
+		http.Error(w, "Failed to retrieve performer details", http.StatusInternalServerError)
+		return
+	}
+
+	var p models.Performer
+	if err := json.Unmarshal([]byte(performerJSON), &p); err != nil {
+		log.Println("Failed to unmarshal performer JSON:", err)
+		http.Error(w, "Failed to process performer data", http.StatusInternalServerError)
+		return
+	}
+
+	// TODO: Associate scenes with the performer
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(p)
+}		
+		func UpdatePerformerPreviewsHandler(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+		
+			go performer.UpdatePerformerPreviewsTask() // Run the task in a goroutine to avoid blocking the HTTP request
+		
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"message": "Update performer previews task started."})
+		}
+		
+		func VideoStreamHandler(w http.ResponseWriter, r *http.Request) {
+			videoName := strings.TrimPrefix(r.URL.Path, "/video/")
+			if videoName == "" {
+				log.Println("Video name not specified in stream request")
+				http.Error(w, "Video name not specified", http.StatusBadRequest)
+				return
+			}
+		
+			videoPath := filepath.Join(config.VideoDir, videoName)
+		
+			// Serve the video file
+			http.ServeFile(w, r, videoPath)
+		}
+		
+		func PreviousLogsHandler(w http.ResponseWriter, r *http.Request) {
+			files, err := os.ReadDir(config.OldLogsDir)
+			if err != nil {
+				log.Println("Failed to read old logs directory:", err)
+				http.Error(w, "Failed to read old logs directory", http.StatusInternalServerError)
+				return
+			}
+		
+			var logFiles []string
+			for _, file := range files {
+				if !file.IsDir() {
+					logFiles = append(logFiles, file.Name())
+				}
+			}
+		
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(logFiles)
+		}
+		
+		func PreviousLogFileHandler(w http.ResponseWriter, r *http.Request) {
+			fileName := strings.TrimPrefix(r.URL.Path, "/api/logs/previous/")
+			if fileName == "" {
+				log.Println("Log file name not specified in request")
+				http.Error(w, "Log file name not specified", http.StatusBadRequest)
+				return
+			}
+		
+			filePath := filepath.Join(config.OldLogsDir, fileName)
+		
+			// Check if the file exists and is within the old_logs directory
+			if _, err := os.Stat(filePath); os.IsNotExist(err) {
+				log.Printf("Log file not found: %s", filePath)
+				http.Error(w, "Log file not found", http.StatusNotFound)
+				return
+			}
+		
+			// Serve the log file
+			http.ServeFile(w, r, filePath)
+		}
+		
+		func CurrentLogsHandler(w http.ResponseWriter, r *http.Request) {
+			// Serve the current app.log file
+			http.ServeFile(w, r, config.LogFile)
+		}
+		
+		func PerformerPreviewHandler(w http.ResponseWriter, r *http.Request) {
+			previewPath := strings.TrimPrefix(r.URL.Path, "/performer-previews/") // Updated prefix
+			if previewPath == "" {
+				http.Error(w, "Preview path not specified", http.StatusBadRequest)
+				return
+			}
+		
+			fullPath := filepath.Join(config.PerformerFoldersDir, previewPath)
+		
+			// Normalize paths for consistent comparison
+			normalizedFullPath := filepath.ToSlash(fullPath)
+			normalizedPerformerFoldersDir := filepath.ToSlash(config.PerformerFoldersDir)
+		
+			// Security check: ensure the path is within the performerFoldersDir
+			if !strings.HasPrefix(normalizedFullPath, normalizedPerformerFoldersDir) {
+				http.Error(w, "Access denied", http.StatusForbidden)
+				return
+			}
+		
+			http.ServeFile(w, r, fullPath)
+		}
+		
+		func RefetchAllPerformerMetadataHandler(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+		
+			go func() {
+				log.Println("Starting task to refetch all performer metadata...")
+				performers, err := database.GetAllPerformerNames()
+				if err != nil {
+					log.Printf("Failed to get all performer names for metadata refetch: %v", err)
+					return
+				}
+		
+				var wg sync.WaitGroup
+				for _, pName := range performers {
+					wg.Add(1)
+					go func(name string) {
+						defer wg.Done()
+						log.Printf("Refetching metadata for %s", name)
+						// Fetch performer data from Adultdatalink API
+						performerDataBytes, err := performer.FetchPerformerData(name)
+						if err != nil {
+							log.Printf("Failed to fetch data for performer %s from Adultdatalink API: %v", name, err)
+							return
+						}
+		
+						var rawAPIResponse map[string]interface{}
+						if err := json.Unmarshal(performerDataBytes, &rawAPIResponse); err != nil {
+							log.Printf("Failed to unmarshal raw Adultdatalink API response for %s: %v", name, err)
+							return
+						}
+		
+						var performerModel models.Performer
+						var existingPerformerJSON string
+						err = database.GetDB().QueryRow("SELECT data FROM performers WHERE name = ?", name).Scan(&existingPerformerJSON)
+						if err != nil {
+							log.Printf("Failed to query existing data for performer %s: %v", name, err)
+							return
+						}
+						if err := json.Unmarshal([]byte(existingPerformerJSON), &performerModel); err != nil {
+							log.Printf("Failed to unmarshal existing data for performer %s: %v", name, err)
+							return
+						}
+		
+						performer.PopulatePerformerFromAPIResponse(&performerModel, rawAPIResponse)
+		
+						updatedPerformerJSON, err := json.Marshal(performerModel)
+						if err != nil {
+							log.Printf("Failed to marshal updated performer %s to JSON: %v", name, err)
+							return
+						}
+		
+						_, err = database.GetDB().Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), name)
+						if err != nil {
+							log.Printf("Failed to update performer %s in database: %v", name, err)
+							return
+						}
+						log.Printf("Successfully refetched and updated metadata for %s.", name)
+					}(pName)
+				}
+				wg.Wait()
+				log.Println("Finished refetching all performer metadata.")
+			}()
+		
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"message": "Task to refetch all performer metadata started."})
+		}
