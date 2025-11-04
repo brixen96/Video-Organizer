@@ -6,7 +6,8 @@
 *.dylib
 video-organizer
 video-organizer.exe
-
+*.db
+video_organizer.db
 # Test binary, built with `go test -c`
 *.test
 

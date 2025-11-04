@@ -6,7 +6,8 @@
       "Bash(test:*)",
       "Bash(make run:*)",
       "Bash(go get:*)",
-      "Bash(go build:*)"
+      "Bash(go build:*)",
+      "Bash(md jscore jscomponents jspages jsutils cssbase csslayout csscomponents csspages cssutils)"
     ],
     "deny": [],
     "ask": []

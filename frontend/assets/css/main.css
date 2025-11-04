@@ -1,0 +1,35 @@
+/**
+ * Main CSS Entry Point
+ * Imports all CSS modules in the correct order
+ */
+
+/* 1. Base Styles (Foundation) */
+@import './base/variables.css';
+@import './base/reset.css';
+
+/* 2. Layout Styles */
+/* TODO: Split from style.css */
+/* @import './layout/grid.css'; */
+/* @import './layout/navbar.css'; */
+/* @import './layout/sidebar.css'; */
+
+/* 3. Component Styles */
+/* TODO: Split from style.css */
+/* @import './components/buttons.css'; */
+/* @import './components/modals.css'; */
+/* @import './components/cards.css'; */
+/* @import './components/forms.css'; */
+
+/* 4. Page-Specific Styles */
+/* TODO: Split from style.css */
+/* @import './pages/scenes.css'; */
+/* @import './pages/performers.css'; */
+/* @import './pages/libraries.css'; */
+
+/* 5. Utility Classes */
+/* TODO: Create utility classes */
+/* @import './utils/utilities.css'; */
+/* @import './utils/animations.css'; */
+
+/* Temporary: Import original styles until fully migrated */
+/* Remove this once all styles are split */
