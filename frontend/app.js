@@ -158,6 +158,10 @@ document.addEventListener('DOMContentLoaded', () => {
 	}
 
 	function renderLibrariesList() {
+		if (!librariesListContainer) {
+			console.error('Libraries list container not found')
+			return
+		}
 		librariesListContainer.innerHTML = ''
 		if (libraries.length === 0) {
 			librariesListContainer.innerHTML =
@@ -598,14 +602,14 @@ document.addEventListener('DOMContentLoaded', () => {
 				.forEach((b) => b.classList.remove('active'))
 			document
 				.querySelectorAll('.tab-pane')
-				.forEach((p) => p.classList.add('hidden'))
+				.forEach((p) => p.classList.remove('active'))
 			const tb = document.querySelector(
 				'.tab-button[data-tab="interface"]'
 			)
 			if (tb) tb.classList.add('active')
 			const pane = document.getElementById('interface')
 			if (pane) {
-				pane.classList.remove('hidden')
+				pane.classList.add('active')
 				pane.scrollIntoView({ behavior: 'smooth' })
 			}
 			// make sure UI reflects current settings
@@ -838,10 +842,20 @@ document.addEventListener('DOMContentLoaded', () => {
 				tabButtons.forEach((btn) => btn.classList.remove('active'))
 				button.classList.add('active')
 
-				tabPanes.forEach((pane) => pane.classList.add('hidden'))
+				tabPanes.forEach((pane) => pane.classList.remove('active'))
 				const targetTab = document.getElementById(button.dataset.tab)
 				if (targetTab) {
-					targetTab.classList.remove('hidden')
+					targetTab.classList.add('active')
+				}
+
+				// Trigger content loading for specific tabs
+				if (button.dataset.tab === 'libraries') {
+					// Always ensure libraries are rendered when tab is opened
+					// This handles both initial load and subsequent visits
+					renderLibrariesList()
+				} else if (button.dataset.tab === 'interface') {
+					// Ensure monitor settings UI is updated
+					applyMonitorSettingsToUI()
 				}
 			})
 		})
@@ -1362,10 +1376,10 @@ document.addEventListener('DOMContentLoaded', () => {
 				tabButtons.forEach((btn) => btn.classList.remove('active'))
 				button.classList.add('active')
 
-				tabPanes.forEach((pane) => pane.classList.add('hidden'))
+				tabPanes.forEach((pane) => pane.classList.remove('active'))
 				const targetTab = document.getElementById(button.dataset.tab)
 				if (targetTab) {
-					targetTab.classList.remove('hidden')
+					targetTab.classList.add('active')
 				}
 			}
 		})
@@ -2051,6 +2065,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 	const displayPreviousLogs = () => {
 		const previousLogsPane = document.getElementById('previous-logs')
+		if (!previousLogsPane) {
+			console.error('Previous logs pane not found')
+			return
+		}
 		previousLogsPane.innerHTML =
 			'<h3>Previous Logs</h3><div id="previous-logs-list">Loading previous logs...</div><pre id="previous-log-content"></pre>'
 		const previousLogsList = document.getElementById('previous-logs-list')
@@ -2124,10 +2142,10 @@ document.addEventListener('DOMContentLoaded', () => {
 				tabButtons.forEach((btn) => btn.classList.remove('active'))
 				button.classList.add('active')
 
-				tabPanes.forEach((pane) => pane.classList.add('hidden'))
+				tabPanes.forEach((pane) => pane.classList.remove('active'))
 				const targetTab = document.getElementById(button.dataset.tab)
 				if (targetTab) {
-					targetTab.classList.remove('hidden')
+					targetTab.classList.add('active')
 				}
 
 				if (button.dataset.tab === 'current-logs') {
