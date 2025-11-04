@@ -2,11 +2,17 @@ const closeDetailsPanelAndPauseVideos = () => {
 	const performerDetailsPanel = document.getElementById(
 		'performer-details-panel'
 	)
+	const performerDetailsOverlay = document.getElementById(
+		'performer-details-overlay'
+	)
 	const performerCarouselVideo = performerDetailsPanel
 		? performerDetailsPanel.querySelector('.performer-carousel video')
 		: null
 	if (performerDetailsPanel) {
 		performerDetailsPanel.classList.remove('active')
+		if (performerDetailsOverlay) {
+			performerDetailsOverlay.classList.remove('active')
+		}
 		if (performerCarouselVideo) {
 			performerCarouselVideo.pause()
 			performerCarouselVideo.src = ''
@@ -969,9 +975,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                     <div class="performer-info">
                         <p class="performer-name">${performer.name}</p>
-                        <p class="performer-scene-count">Scenes: ${
-							performer.scene_count
-						}</p>
+                        <span class="performer-scene-count">${performer.scene_count || 0}</span>
                     </div>
                 `
 				const videoElement = performerItem.querySelector('video')
@@ -1317,8 +1321,14 @@ document.addEventListener('DOMContentLoaded', () => {
 		const closeDetailsButton = performerDetailsPanel.querySelector(
 			'.close-details-button'
 		)
+		const performerDetailsOverlay = document.getElementById(
+			'performer-details-overlay'
+		)
 
 		performerDetailsPanel.classList.add('active')
+		if (performerDetailsOverlay) {
+			performerDetailsOverlay.classList.add('active')
+		}
 		performerProfileContent.innerHTML = 'Loading profile...'
 		performerScenesContent.innerHTML = 'Loading scenes...'
 		performerAppearanceContent.innerHTML = 'Loading appearance...'
@@ -1330,6 +1340,13 @@ document.addEventListener('DOMContentLoaded', () => {
 		// Close button for details panel
 		closeDetailsButton.onclick = () => {
 			closeDetailsPanelAndPauseVideos()
+		}
+
+		// Close on overlay click
+		if (performerDetailsOverlay) {
+			performerDetailsOverlay.onclick = () => {
+				closeDetailsPanelAndPauseVideos()
+			}
 		}
 
 		// Handle tabs within the details panel

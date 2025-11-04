@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Video Storage AI</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style-polished.css?v=8">
+    <!-- Fallback to original styles if needed -->
+    <!-- <link rel="stylesheet" href="style.css"> -->
 </head>
 <body>
     <nav class="navbar">
@@ -15,23 +17,6 @@
                     <option>Loading libraries...</option>
                 </select>
             </div>
-            <div id="activity-monitor-container" class="activity-monitor-container">
-                <button id="activity-monitor-button" title="Activity Monitor">🔔 <span id="monitor-indicator" class="monitor-indicator monitor-green"></span></button>
-                <span id="monitor-status-text" class="monitor-status-text">Idle</span>
-                <div id="activity-monitor-panel" class="activity-monitor-panel hidden">
-                    <div class="activity-monitor-header">
-                        <span>App Activity</span>
-                        <div class="activity-monitor-actions">
-                            <button id="monitor-clear-btn">Clear</button>
-                        </div>
-                    </div>
-                    <div id="monitor-panel-status" class="monitor-panel-status">No activity</div>
-                    <div id="activity-monitor-filters" class="activity-monitor-filters">
-                        <!-- basic filter badges will be inserted by JS -->
-                    </div>
-                    <ul id="activity-monitor-list" class="activity-monitor-list"></ul>
-                </div>
-            </div>
         </div>
 		<ul class="nav-list nav-center">
 			<li><a href="#dashboard">Dashboard</a></li>
@@ -41,7 +26,28 @@
 			<li><a href="#performers">Performers</a></li>
 			<li><a href="#tags">Tags</a></li>
 			<li><a href="#markers">Markers</a></li>
+			<li>
+				<div id="activity-monitor-container" class="activity-monitor-container">
+					<button id="activity-monitor-button" title="Activity Monitor">🔔 <span id="monitor-indicator" class="monitor-indicator monitor-green"></span></button>
+					<span id="monitor-status-text" class="monitor-status-text">Idle</span>
+					<div id="activity-monitor-panel" class="activity-monitor-panel hidden">
+						<div class="activity-monitor-header">
+							<span>App Activity</span>
+							<div class="activity-monitor-actions">
+								<button id="monitor-clear-btn">Clear</button>
+							</div>
+						</div>
+						<div id="monitor-panel-status" class="monitor-panel-status">No activity</div>
+						<div id="activity-monitor-filters" class="activity-monitor-filters">
+							<!-- basic filter badges will be inserted by JS -->
+						</div>
+						<ul id="activity-monitor-list" class="activity-monitor-list"></ul>
+					</div>
+				</div>
+
+			</li>
 		</ul>
+
         <ul class="nav-list nav-right">
 			<li><a href="#logs">Logs</a></li>
             <li><a href="#settings">Settings</a></li>
@@ -274,32 +280,27 @@
                     </div>
                     <div class="tab-content">
                         <div id="performer-profile" class="tab-pane active">
-                            <h3>Profile</h3>
                             <div id="performer-profile-content"></div>
                         </div>
                         <div id="performer-scenes" class="tab-pane hidden">
-                            <h3>Scenes</h3>
                             <div id="performer-scenes-content" class="video-grid"></div>
                         </div>
                         <div id="performer-appearance" class="tab-pane hidden">
-                            <h3>Appearance</h3>
                             <div id="performer-appearance-content"></div>
                         </div>
                         <div id="performer-tags" class="tab-pane hidden">
-                            <h3>Tags</h3>
                             <div id="performer-tags-content"></div>
                         </div>
                         <div id="performer-bios" class="tab-pane hidden">
-                            <h3>Bios</h3>
                             <div id="performer-bios-content"></div>
                         </div>
                         <div id="performer-other-info" class="tab-pane hidden">
-                            <h3>Other Info</h3>
                             <div id="performer-other-info-content"></div>
                         </div>
                     </div>
                 </div>
             </div>
+            <div class="performer-details-overlay" id="performer-details-overlay"></div>
         </div>
     </main>
 
