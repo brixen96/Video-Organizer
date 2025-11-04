@@ -18,7 +18,7 @@
 
 ## 📝 Overview
 
-Video Organizer is a Python-based Windows desktop application designed to act as a video browser, video player, and AI-powered library organizer. Its primary purpose is to provide a YouTube-like browsing experience for user-defined video folders while including powerful organization tools and an AI assistant for maintaining and improving large video libraries.
+Video Organizer is a Go programming language based Windows desktop application designed to act as a video browser, video player, and AI-powered library organizer. Its primary purpose is to provide a YouTube-like browsing experience for user-defined video folders while including powerful organization tools and an AI assistant for maintaining and improving large video libraries.
 
 ## 🎬 Context & Backstory
 

@@ -1,7 +1,6 @@
 package video
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -24,6 +23,25 @@ var (
 
 func InitializeVideoCache() {
 	appstatus.EmitInfo("[Task]", "Starting video cache initialization")
+
+	// OPTIMIZATION: Try loading from disk cache first
+	if IsCacheValid(config.VideoDir) {
+		cachedVideos, err := LoadCacheFromDisk()
+		if err == nil && len(cachedVideos) > 0 {
+			cacheMutex.Lock()
+			VideoCache = cachedVideos
+			cacheMutex.Unlock()
+
+			appstatus.EmitInfo("[Task]", fmt.Sprintf("Video cache loaded from disk with %d videos (instant startup!)", len(VideoCache)))
+
+			// Update performer scene counts in the background
+			go UpdatePerformerSceneCounts()
+			return
+		}
+		appstatus.EmitWarning("[Warning]", fmt.Sprintf("Failed to load cache from disk: %v, rebuilding...", err))
+	}
+
+	// Cache not valid or doesn't exist, build from scratch
 	cacheMutex.Lock()
 	VideoCache = make(map[string]models.VideoInfo)
 	cacheMutex.Unlock()
@@ -94,6 +112,13 @@ func InitializeVideoCache() {
 	}
 
 	appstatus.EmitInfo("[Task]", fmt.Sprintf("Video cache initialized with %d videos", len(VideoCache)))
+
+	// Save cache to disk for next startup
+	go func() {
+		if err := SaveCacheToDisk(); err != nil {
+			log.Printf("Failed to save cache to disk: %v", err)
+		}
+	}()
 
 	// Update performer scene counts in the database
 	UpdatePerformerSceneCounts()
@@ -202,55 +227,104 @@ func UpdatePerformerSceneCounts() {
 
 	appstatus.EmitInfo("[Info]", fmt.Sprintf("Found %d performers with scenes", len(performerSceneCounts)))
 
-	// Update database
-	updateCount := 0
-	totalCount := len(performerSceneCounts)
-	for pName, count := range performerSceneCounts {
-		updateCount++
-		performerJSON := ""
-		err := database.GetDB().QueryRow("SELECT data FROM performers WHERE name = ?", pName).Scan(&performerJSON)
-		if err == sql.ErrNoRows {
-			msg := fmt.Sprintf("Performer %s not found in DB, skipping scene count update", pName)
-			appstatus.EmitWarning("[Warning]", msg)
-			log.Printf(msg)
-			continue
-		} else if err != nil {
-			msg := fmt.Sprintf("Error querying performer %s for scene count update: %v", pName, err)
-			appstatus.EmitError("[Error]", msg)
-			log.Printf(msg)
+	if len(performerSceneCounts) == 0 {
+		appstatus.EmitInfo("[Task]", "No performers to update")
+		return
+	}
+
+	// OPTIMIZED: Batch fetch all performers in one query
+	performerNames := make([]string, 0, len(performerSceneCounts))
+	for pName := range performerSceneCounts {
+		performerNames = append(performerNames, pName)
+	}
+
+	// Build placeholders for IN clause
+	placeholders := make([]string, len(performerNames))
+	args := make([]interface{}, len(performerNames))
+	for i, name := range performerNames {
+		placeholders[i] = "?"
+		args[i] = name
+	}
+
+	query := fmt.Sprintf("SELECT name, data FROM performers WHERE name IN (%s)", strings.Join(placeholders, ","))
+	rows, err := database.GetDB().Query(query, args...)
+	if err != nil {
+		msg := fmt.Sprintf("Error batch querying performers: %v", err)
+		appstatus.EmitError("[Error]", msg)
+		log.Printf(msg)
+		return
+	}
+	defer rows.Close()
+
+	// Parse all performers
+	performersToUpdate := make(map[string]models.Performer)
+	for rows.Next() {
+		var name, performerJSON string
+		if err := rows.Scan(&name, &performerJSON); err != nil {
+			log.Printf("Error scanning performer: %v", err)
 			continue
 		}
 
 		var performer models.Performer
 		if err := json.Unmarshal([]byte(performerJSON), &performer); err != nil {
-			msg := fmt.Sprintf("Error parsing data for performer %s: %v", pName, err)
-			appstatus.EmitError("[Error]", msg)
-			log.Printf(msg)
+			log.Printf("Error parsing performer %s: %v", name, err)
 			continue
 		}
 
-		performer.SceneCount = count
-		updatedPerformerJSON, err := json.Marshal(performer)
+		performer.SceneCount = performerSceneCounts[name]
+		performersToUpdate[name] = performer
+	}
+
+	appstatus.EmitInfo("[Info]", fmt.Sprintf("Updating %d performers in batch", len(performersToUpdate)))
+
+	// OPTIMIZED: Batch update using transaction
+	tx, err := database.GetDB().Begin()
+	if err != nil {
+		msg := fmt.Sprintf("Error starting transaction: %v", err)
+		appstatus.EmitError("[Error]", msg)
+		log.Printf(msg)
+		return
+	}
+
+	stmt, err := tx.Prepare("UPDATE performers SET data = ? WHERE name = ?")
+	if err != nil {
+		tx.Rollback()
+		msg := fmt.Sprintf("Error preparing statement: %v", err)
+		appstatus.EmitError("[Error]", msg)
+		log.Printf(msg)
+		return
+	}
+	defer stmt.Close()
+
+	updateCount := 0
+	totalCount := len(performersToUpdate)
+	for name, performer := range performersToUpdate {
+		updatedJSON, err := json.Marshal(performer)
 		if err != nil {
-			msg := fmt.Sprintf("Error serializing updated data for performer %s: %v", pName, err)
-			appstatus.EmitError("[Error]", msg)
-			log.Printf(msg)
+			log.Printf("Error marshaling performer %s: %v", name, err)
 			continue
 		}
 
-		_, err = database.GetDB().Exec("UPDATE performers SET data = ? WHERE name = ?", string(updatedPerformerJSON), pName)
+		_, err = stmt.Exec(string(updatedJSON), name)
 		if err != nil {
-			msg := fmt.Sprintf("Error saving scene count for performer %s: %v", pName, err)
-			appstatus.EmitError("[Error]", msg)
-			log.Printf(msg)
+			log.Printf("Error updating performer %s: %v", name, err)
 			continue
 		}
 
-		if updateCount%5 == 0 || updateCount == totalCount { // Report progress every 5 performers
+		updateCount++
+		if updateCount%10 == 0 || updateCount == totalCount {
 			appstatus.EmitInfo("[Progress]", fmt.Sprintf("Updated scene counts for %d/%d performers", updateCount, totalCount))
 		}
 	}
-	appstatus.EmitInfo("[Task]", "Completed performer scene count update")
+
+	if err := tx.Commit(); err != nil {
+		msg := fmt.Sprintf("Error committing transaction: %v", err)
+		appstatus.EmitError("[Error]", msg)
+		log.Printf(msg)
+		return
+	}
+
+	appstatus.EmitInfo("[Task]", fmt.Sprintf("Completed performer scene count update (%d updated)", updateCount))
 }
 
 // min returns the minimum of two integers
