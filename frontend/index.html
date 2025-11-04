@@ -1,331 +1,510 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Video Storage AI</title>
-    <link rel="stylesheet" href="style-polished.css?v=8">
-	
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Video Storage AI</title>
+		<!-- Bootstrap CSS -->
+		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" />
+		<!-- Custom CSS (overrides and additions) -->
+		<link rel="stylesheet" href="style-bootstrap.css" />
+	</head>
+	<body class="bg-dark text-light">
+		<!-- Navigation -->
+		<nav class="navbar navbar-expand-lg navbar-dark bg-darker sticky-top">
+			<div class="container-fluid">
+				<span class="navbar-brand mb-0 h1 text-primary">Video Storage AI</span>
 
-    <!-- Fallback to original styles if needed -->
-    <!-- <link rel="stylesheet" href="style.css"> -->
-</head>
-<body>
-    <nav class="navbar">
-        <div class="navbar-left">
-            <div class="navbar-brand">Video Storage AI</div>
-            <div id="library-dropdown-container" class="library-dropdown-container">
-                <select id="library-select" aria-label="Select Library">
-                    <option>Loading libraries...</option>
-                </select>
-            </div>
-        </div>
-		<ul class="nav-list nav-center">
-			<li><a href="#dashboard">Dashboard</a></li>
-			<li><a href="#scenes">Scenes</a></li>
-			<li><a href="#groups">Groups</a></li>
-			<li><a href="#studios">Studios</a></li>
-			<li><a href="#performers">Performers</a></li>
-			<li><a href="#tags">Tags</a></li>
-			<li><a href="#markers">Markers</a></li>
-			<li>
-				<div id="activity-monitor-container" class="activity-monitor-container">
-					<button id="activity-monitor-button" title="Activity Monitor">🔔 <span id="monitor-indicator" class="monitor-indicator monitor-green"></span></button>
-					<span id="monitor-status-text" class="monitor-status-text">Idle</span>
-					<div id="activity-monitor-panel" class="activity-monitor-panel hidden">
-						<div class="activity-monitor-header">
-							<span>App Activity</span>
-							<div class="activity-monitor-actions">
-								<button id="monitor-clear-btn">Clear</button>
+				<!-- Library Selector -->
+				<div class="me-auto ms-3">
+					<select id="library-select" class="form-select form-select-sm bg-dark text-light" style="min-width: 200px">
+						<option>Loading libraries...</option>
+					</select>
+				</div>
+
+				<!-- Navbar Toggle for Mobile -->
+				<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+					<span class="navbar-toggler-icon"></span>
+				</button>
+
+				<!-- Navbar Links -->
+				<div class="collapse navbar-collapse" id="navbarNav">
+					<ul class="navbar-nav mx-auto">
+						<li class="nav-item">
+							<a class="nav-link" href="#dashboard">Dashboard</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link" href="#scenes">Scenes</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link" href="#browser">Browser</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link" href="#groups">Groups</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link" href="#studios">Studios</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link" href="#performers">Performers</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link" href="#tags">Tags</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link" href="#markers">Markers</a>
+						</li>
+					</ul>
+
+					<ul class="navbar-nav ms-auto">
+						<!-- Activity Monitor -->
+						<li class="nav-item dropdown me-2">
+							<a class="nav-link" href="#" id="activity-monitor-button" role="button" data-bs-toggle="dropdown">
+								🔔
+								<span id="monitor-indicator" class="badge bg-success"></span>
+							</a>
+							<div class="dropdown-menu dropdown-menu-end p-0" id="activity-monitor-panel" style="min-width: 400px">
+								<div class="card bg-dark border-secondary">
+									<div class="card-header d-flex justify-content-between align-items-center">
+										<span class="text-primary">App Activity</span>
+										<button id="monitor-clear-btn" class="btn btn-sm btn-outline-secondary text-danger">Clear</button>
+									</div>
+									<div class="card-body p-2">
+										<div id="activity-monitor-list" class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto"></div>
+									</div>
+								</div>
+							</div>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link" href="#logs">Logs</a>
+						</li>
+						<li class="nav-item">
+							<a class="nav-link" href="#settings">Settings</a>
+						</li>
+					</ul>
+				</div>
+			</div>
+		</nav>
+
+		<!-- Main Content -->
+		<main class="container-fluid p-3">
+			<!-- Scenes Page -->
+			<div id="scenes-page" class="page">
+				<div id="video-grid" class="row row-cols-2 row-cols-md-3 row-cols-lg-4 row-cols-xl-6 g-3">
+					<!-- Video cards will be inserted here by JavaScript -->
+				</div>
+			</div>
+
+			<!-- Settings Page -->
+			<div id="settings-page" class="page d-none">
+				<h2 class="mb-4">Settings</h2>
+
+				<!-- Bootstrap Tabs -->
+				<ul class="nav nav-tabs" id="settingsTabs" role="tablist">
+					<li class="nav-item" role="presentation">
+						<button class="nav-link active" id="tasks-tab" data-bs-toggle="tab" data-bs-target="#tasks" type="button">Tasks</button>
+					</li>
+					<li class="nav-item" role="presentation">
+						<button class="nav-link" id="libraries-tab" data-bs-toggle="tab" data-bs-target="#libraries" type="button">Libraries</button>
+					</li>
+					<li class="nav-item" role="presentation">
+						<button class="nav-link" id="interface-tab" data-bs-toggle="tab" data-bs-target="#interface" type="button">Interface</button>
+					</li>
+					<li class="nav-item" role="presentation">
+						<button class="nav-link" id="metadata-tab" data-bs-toggle="tab" data-bs-target="#metadata" type="button">Metadata Providers</button>
+					</li>
+					<li class="nav-item" role="presentation">
+						<button class="nav-link" id="tools-tab" data-bs-toggle="tab" data-bs-target="#tools" type="button">Tools</button>
+					</li>
+					<li class="nav-item" role="presentation">
+						<button class="nav-link" id="changelog-tab" data-bs-toggle="tab" data-bs-target="#changelog" type="button">Changelog</button>
+					</li>
+				</ul>
+
+				<!-- Tab Content -->
+				<div class="tab-content mt-3" id="settingsTabContent">
+					<!-- Tasks Tab -->
+					<div class="tab-pane fade show active" id="tasks" role="tabpanel">
+						<div class="card bg-dark border-secondary">
+							<div class="card-body">
+								<button id="update-performer-previews-button" class="btn btn-primary mb-2">Update Performer Previews</button>
+								<p id="update-performer-previews-status" class="text-muted"></p>
+								<button id="refetch-all-performer-metadata-button" class="btn btn-primary mb-2">Re-fetch All Performer Metadata</button>
+								<p id="refetch-all-performer-metadata-status" class="text-muted"></p>
 							</div>
 						</div>
-						<div id="monitor-panel-status" class="monitor-panel-status">No activity</div>
-						<div id="activity-monitor-filters" class="activity-monitor-filters">
-							<!-- basic filter badges will be inserted by JS -->
+					</div>
+
+					<!-- Libraries Tab -->
+					<div class="tab-pane fade" id="libraries" role="tabpanel">
+						<div class="card bg-dark border-secondary">
+							<div class="card-header d-flex justify-content-between align-items-center">
+								<h5 class="mb-0">Libraries</h5>
+								<button id="add-library-button" class="btn btn-sm btn-success">+ Add Library</button>
+							</div>
+							<div class="card-body">
+								<div id="libraries-list-container">
+									<!-- Libraries table will be rendered here by JS -->
+								</div>
+							</div>
 						</div>
-						<ul id="activity-monitor-list" class="activity-monitor-list"></ul>
+					</div>
+
+					<!-- Interface Tab -->
+					<div class="tab-pane fade" id="interface" role="tabpanel">
+						<div class="card bg-dark border-secondary">
+							<div class="card-header">
+								<h5 class="mb-0">App Activity Monitor</h5>
+							</div>
+							<div class="card-body">
+								<p class="text-muted">Choose which categories of events should appear in the Activity Monitor.</p>
+
+								<div class="row g-3">
+									<div class="col-md-6">
+										<div class="form-check">
+											<input class="form-check-input" type="checkbox" id="ms-toggle-task" checked />
+											<label class="form-check-label" for="ms-toggle-task">[Task] Events</label>
+										</div>
+										<div class="form-check">
+											<input class="form-check-input" type="checkbox" id="ms-toggle-progress" checked />
+											<label class="form-check-label" for="ms-toggle-progress">[Progress] Events</label>
+										</div>
+										<div class="form-check">
+											<input class="form-check-input" type="checkbox" id="ms-toggle-info" checked />
+											<label class="form-check-label" for="ms-toggle-info">[Info] Events</label>
+										</div>
+									</div>
+									<div class="col-md-6">
+										<div class="form-check">
+											<input class="form-check-input" type="checkbox" id="ms-toggle-warning" checked />
+											<label class="form-check-label" for="ms-toggle-warning">[Warning] Events</label>
+										</div>
+										<div class="form-check">
+											<input class="form-check-input" type="checkbox" id="ms-toggle-error" checked />
+											<label class="form-check-label" for="ms-toggle-error">[Error] Events</label>
+										</div>
+										<div class="form-check">
+											<input class="form-check-input" type="checkbox" id="ms-errors-only" />
+											<label class="form-check-label" for="ms-errors-only">Errors Only Mode</label>
+										</div>
+									</div>
+								</div>
+
+								<div class="mt-3">
+									<button id="ms-save-btn" class="btn btn-outline-secondary text-success me-2">Save Monitor Settings</button>
+									<button id="ms-reset-btn" class="btn btn-outline-secondary text-danger">Reset to Defaults</button>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Metadata Tab -->
+					<div class="tab-pane fade" id="metadata" role="tabpanel">
+						<div class="card bg-dark border-secondary">
+							<div class="card-body">
+								<p>Content for Metadata Providers settings...</p>
+							</div>
+						</div>
+					</div>
+
+					<!-- Tools Tab -->
+					<div class="tab-pane fade" id="tools" role="tabpanel">
+						<div class="card bg-dark border-secondary">
+							<div class="card-body">
+								<p>Content for Tools settings...</p>
+							</div>
+						</div>
+					</div>
+
+					<!-- Changelog Tab -->
+					<div class="tab-pane fade" id="changelog" role="tabpanel">
+						<div class="card bg-dark border-secondary">
+							<div class="card-body">
+								<p>Content for Changelog...</p>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Logs Page -->
+			<div id="logs-page" class="page d-none">
+				<h2 class="mb-4">Application Logs</h2>
+
+				<!-- Bootstrap Tabs -->
+				<ul class="nav nav-tabs" id="logsTabs" role="tablist">
+					<li class="nav-item" role="presentation">
+						<button class="nav-link active" id="current-logs-tab" data-bs-toggle="tab" data-bs-target="#current-logs" type="button">Current Logs</button>
+					</li>
+					<li class="nav-item" role="presentation">
+						<button class="nav-link" id="previous-logs-tab" data-bs-toggle="tab" data-bs-target="#previous-logs" type="button">Previous Logs</button>
+					</li>
+					<li class="nav-item" role="presentation">
+						<button class="nav-link" id="ai-logs-tab" data-bs-toggle="tab" data-bs-target="#ai-logs" type="button">AI Logs</button>
+					</li>
+				</ul>
+
+				<!-- Tab Content -->
+				<div class="tab-content mt-3" id="logsTabContent">
+					<div class="tab-pane fade show active" id="current-logs" role="tabpanel">
+						<div class="card bg-dark border-secondary">
+							<div class="card-body">
+								<pre id="log-output" class="bg-black text-light p-3 rounded" style="max-height: 600px; overflow-y: auto"></pre>
+							</div>
+						</div>
+					</div>
+
+					<div class="tab-pane fade" id="previous-logs" role="tabpanel">
+						<div class="card bg-dark border-secondary">
+							<div class="card-body">
+								<div id="previous-logs-list" class="mb-3"></div>
+								<pre id="previous-log-content" class="bg-black text-light p-3 rounded" style="max-height: 600px; overflow-y: auto"></pre>
+							</div>
+						</div>
+					</div>
+
+					<div class="tab-pane fade" id="ai-logs" role="tabpanel">
+						<div class="card bg-dark border-secondary">
+							<div class="card-body">
+								<pre class="bg-black text-light p-3 rounded">Content for AI Logs...</pre>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Performers Page -->
+			<div id="performers-page" class="page d-none">
+				<!-- Filter Bar -->
+				<div class="card bg-dark border-secondary mb-3">
+					<div class="card-body">
+						<div class="row g-3 align-items-end">
+							<div class="col-md-3">
+								<label for="performer-sort-by" class="form-label">Sort by</label>
+								<select id="performer-sort-by" class="form-select bg-dark text-light">
+									<option value="name-asc">Name (A-Z)</option>
+									<option value="name-desc">Name (Z-A)</option>
+									<option value="age-desc">Age (Oldest-Youngest)</option>
+									<option value="age-asc">Age (Youngest-Oldest)</option>
+									<option value="cup-desc">Breast Size (Large-Small)</option>
+									<option value="cup-asc">Breast Size (Small-Large)</option>
+									<option value="height-desc">Height (Tall-Short)</option>
+									<option value="height-asc">Height (Short-Tall)</option>
+									<option value="rating-desc">Rating (High-Low)</option>
+									<option value="rating-asc">Rating (Low-High)</option>
+									<option value="total-views-desc">Total Views (High-Low)</option>
+									<option value="total-views-asc">Total Views (Low-High)</option>
+								</select>
+							</div>
+							<div class="col-md-2">
+								<label for="performer-filter-zoo" class="form-label">Zoo</label>
+								<select id="performer-filter-zoo" class="form-select bg-dark text-light">
+									<option value="all">All</option>
+									<option value="yes">Yes</option>
+									<option value="no">No</option>
+								</select>
+							</div>
+							<div class="col-md-2">
+								<label class="form-label">Age Range</label>
+								<div class="d-flex gap-2 align-items-center">
+									<input type="range" id="age-min" class="form-range" />
+									<span id="age-min-value" class="badge bg-secondary">0</span>
+								</div>
+								<div class="d-flex gap-2 align-items-center">
+									<input type="range" id="age-max" class="form-range" />
+									<span id="age-max-value" class="badge bg-secondary">0</span>
+								</div>
+							</div>
+							<div class="col-md-2">
+								<label class="form-label">Breast Size</label>
+								<div class="d-flex gap-2">
+									<select id="cup-min" class="form-select form-select-sm bg-dark text-light"></select>
+									<select id="cup-max" class="form-select form-select-sm bg-dark text-light"></select>
+								</div>
+							</div>
+							<div class="col-md-2">
+								<label class="form-label">Height Range</label>
+								<div class="d-flex gap-2 align-items-center">
+									<input type="range" id="height-min" class="form-range" />
+									<span id="height-min-value" class="badge bg-secondary">0</span>
+								</div>
+								<div class="d-flex gap-2 align-items-center">
+									<input type="range" id="height-max" class="form-range" />
+									<span id="height-max-value" class="badge bg-secondary">0</span>
+								</div>
+							</div>
+							<div class="col-md-1">
+								<button id="apply-filters-button" class="btn btn-primary w-100">Apply</button>
+								<button id="reset-filters-button" class="btn btn-outline-secondary w-100 mt-1">Reset</button>
+							</div>
+						</div>
 					</div>
 				</div>
 
-			</li>
-		</ul>
+				<!-- Performer Wall -->
+				<div id="performer-wall" class="row row-cols-2 row-cols-md-3 row-cols-lg-4 row-cols-xl-6 g-1">
+					<!-- Performer cards will be inserted here by JavaScript -->
+				</div>
 
-        <ul class="nav-list nav-right">
-			<li><a href="#logs">Logs</a></li>
-            <li><a href="#settings">Settings</a></li>
-        </ul>
-    </nav>
-    <main class="main-content">
-        <div id="scenes-page" class="page active">
-            <div class="video-grid" id="video-grid">
-                <!-- Video thumbnails will be inserted here by JavaScript -->
-            </div>
-        </div>
+				<!-- Performer Details Panel -->
+				<div id="performer-details-panel" class="offcanvas offcanvas-end bg-dark text-light" style="width: 70%">
+					<div class="offcanvas-body">
+						<!-- Carousel -->
+						<div id="performer-carousel" class="mb-3"></div>
 
-        <div id="settings-page" class="page">
-            <div class="tabs">
-                <div class="tab-buttons">
-                    <button class="tab-button active" data-tab="tasks">Tasks</button>
-                    <button class="tab-button" data-tab="libraries">Libraries</button>
-                    <button class="tab-button" data-tab="interface">Interface</button>
-                    <button class="tab-button" data-tab="metadata">Metadata Providers</button>
-                    <button class="tab-button" data-tab="tools">Tools</button>
-                    <button class="tab-button" data-tab="changelog">Changelog</button>
-                </div>
-                <div class="tab-content">
-                    <div id="tasks" class="tab-pane active">
-						<br>
-                        <button id="update-performer-previews-button">Update Performer Previews</button>
-                        <p id="update-performer-previews-status"></p>
-                        <button id="refetch-all-performer-metadata-button">Re-fetch All Performer Metadata</button>
-                        <p id="refetch-all-performer-metadata-status"></p>
-                    </div>
-                    <div id="libraries" class="tab-pane">
-						<div id="libraries-list-container">
-							<!-- Libraries table will be rendered here by JS -->
-                        </div>
-						<button id="add-library-button" class="add-library-btn">+ Add Library</button>
-                        <!-- Add/Edit Library Modal -->
-                        <div id="library-modal" class="modal">
-                            <div class="modal-content library-modal-content">
-                                <span class="close-button" id="close-library-modal">&times;</span>
-                                <h2 id="library-modal-title">Add Library</h2>
-                                <form id="library-form">
-                                    <div class="form-group">
-                                        <label for="library-name">Name</label>
-                                        <input type="text" id="library-name" name="name" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="library-path">Path</label>
-                                        <input type="text" id="library-path" name="path" required>
-                                        <button type="button" id="library-path-picker" title="Pick folder">📁</button>
-                                        <!-- Hidden folder picker to allow directory selection (webkitdirectory fallback) -->
-                                        <input type="file" id="library-folder-input" webkitdirectory directory multiple style="display:none">
-                                    </div>
-                                    <div class="form-actions">
-                                        <button type="submit" id="save-library-btn">Save</button>
-                                        <button type="button" id="cancel-library-btn">Cancel</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                        <!-- Delete Confirmation Modal -->
-                        <div id="delete-library-modal" class="modal">
-                            <div class="modal-content delete-modal-content">
-                                <span class="close-button" id="close-delete-library-modal">&times;</span>
-                                <h2>Delete Library</h2>
-                                <p id="delete-library-message">Are you sure you want to delete this library?</p>
-                                <div class="form-actions">
-                                    <button id="cancel-delete-library-btn">Cancel</button>
-                                    <button id="confirm-delete-library-btn" class="danger">Delete</button>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Context Menu for Libraries -->
-                        <div id="libraries-context-menu" class="context-menu">
-                            <ul>
-                                <li id="edit-library-menu">✏️ Edit Library</li>
-                                <li id="delete-library-menu">🗑️ Delete Library</li>
-                                <li id="set-default-library-menu">⭐ Set as Default</li>
-                            </ul>
-                        </div>
-                    </div>
-                    <div id="interface" class="tab-pane">
-                        <div class="monitor-settings">
-                            <h4>App Activity Monitor</h4>
-                            <p>Choose which categories of events should appear in the Activity Monitor. Settings persist in your browser.</p>
-                            <div class="monitor-toggle-group">
-                                <label><input type="checkbox" id="ms-toggle-task" checked> [Task] Events</label>
-                                <label><input type="checkbox" id="ms-toggle-progress" checked> [Progress] Events</label>
-                                <label><input type="checkbox" id="ms-toggle-info" checked> [Info] Events</label>
-                                <label><input type="checkbox" id="ms-toggle-warning" checked> [Warning] Events</label>
-                                <label><input type="checkbox" id="ms-toggle-error" checked> [Error] Events</label>
-                            </div>
-                            <div class="monitor-toggle-group">
-                                <label><input type="checkbox" id="ms-errors-only"> Errors Only Mode</label>
-                            </div>
-                            <div class="monitor-toggle-actions">
-                                <button id="ms-save-btn">Save Monitor Settings</button>
-                                <button id="ms-reset-btn">Reset to Defaults</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="metadata" class="tab-pane">
-                        <p>Content for Metadata Providers settings...</p>
-                    </div>
-                    <div id="tools" class="tab-pane">
-                        <p>Content for Tools settings...</p>
-                    </div>
-                    <div id="changelog" class="tab-pane">
-                        <p>Content for Changelog...</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+						<!-- Tabs -->
+						<ul class="nav nav-tabs" id="performerTabs" role="tablist">
+							<li class="nav-item" role="presentation">
+								<button class="nav-link active" data-bs-toggle="tab" data-bs-target="#performer-profile" type="button">Profile</button>
+							</li>
+							<li class="nav-item" role="presentation">
+								<button class="nav-link" data-bs-toggle="tab" data-bs-target="#performer-scenes" type="button">Scenes</button>
+							</li>
+							<li class="nav-item" role="presentation">
+								<button class="nav-link" data-bs-toggle="tab" data-bs-target="#performer-appearance" type="button">Appearance</button>
+							</li>
+							<li class="nav-item" role="presentation">
+								<button class="nav-link" data-bs-toggle="tab" data-bs-target="#performer-tags" type="button">Tags</button>
+							</li>
+							<li class="nav-item" role="presentation">
+								<button class="nav-link" data-bs-toggle="tab" data-bs-target="#performer-bios" type="button">Bios</button>
+							</li>
+							<li class="nav-item" role="presentation">
+								<button class="nav-link" data-bs-toggle="tab" data-bs-target="#performer-other-info" type="button">Other Info</button>
+							</li>
+						</ul>
 
-        <div id="logs-page" class="page">
-            <div class="tabs">
-                <div class="tab-buttons">
-                    <button class="tab-button active" data-tab="current-logs">Current Logs</button>
-                    <button class="tab-button" data-tab="previous-logs">Previous Logs</button>
-                    <button class="tab-button" data-tab="ai-logs">AI Logs</button>
-                </div>
-                <div class="tab-content">
-                    <div id="current-logs" class="tab-pane active">
-                        <pre id="log-output"></pre>
-                    </div>
-                    <div id="previous-logs" class="tab-pane">
-                        <div id="previous-logs-list"></div>
-                        <pre id="previous-log-content"></pre>
-                    </div>
-                    <div id="ai-logs" class="tab-pane">
-                        <pre>Content for AI Logs...</pre>
-                    </div>
-                </div>
-            </div>
-        </div>
+						<div class="tab-content mt-3">
+							<div class="tab-pane fade show active" id="performer-profile">
+								<div id="performer-profile-content"></div>
+							</div>
+							<div class="tab-pane fade" id="performer-scenes">
+								<div id="performer-scenes-content" class="row g-3"></div>
+							</div>
+							<div class="tab-pane fade" id="performer-appearance">
+								<div id="performer-appearance-content"></div>
+							</div>
+							<div class="tab-pane fade" id="performer-tags">
+								<div id="performer-tags-content"></div>
+							</div>
+							<div class="tab-pane fade" id="performer-bios">
+								<div id="performer-bios-content"></div>
+							</div>
+							<div class="tab-pane fade" id="performer-other-info">
+								<div id="performer-other-info-content"></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</main>
 
-        <div id="performers-page" class="page">
-            <div class="filter-bar" id="performer-filter-bar">
-                <div class="filter-group">
-                    <label for="performer-sort-by">Sort by:</label>
-                    <select id="performer-sort-by">
-                        <option value="name-asc">Name (A-Z)</option>
-                        <option value="name-desc">Name (Z-A)</option>
-                        <option value="age-desc">Age (Oldest-Youngest)</option>
-                        <option value="age-asc">Age (Youngest-Oldest)</option>
-                        <option value="cup-desc">Breast Size (Large-Small)</option>
-                        <option value="cup-asc">Breast Size (Small-Large)</option>
-                        <option value="height-desc">Height (Tall-Short)</option>
-                        <option value="height-asc">Height (Short-Tall)</option>
-                        <option value="rating-desc">Rating (High-Low)</option>
-                        <option value="rating-asc">Rating (Low-High)</option>
-                        <option value="total-views-desc">Total Views (High-Low)</option>
-                        <option value="total-views-asc">Total Views (Low-High)</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label for="performer-filter-zoo">Zoo:</label>
-                    <select id="performer-filter-zoo">
-                        <option value="all">All</option>
-                        <option value="yes">Yes</option>
-                        <option value="no">No</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label>Age:</label>
-                    <div class="slider-control">
-                        <label for="age-min">Min:</label>
-                        <input type="range" id="age-min">
-                        <span id="age-min-value"></span>
-                    </div>
-                    <div class="slider-control">
-                        <label for="age-max">Max:</label>
-                        <input type="range" id="age-max">
-                        <span id="age-max-value"></span>
-                    </div>
-                </div>
-                <div class="filter-group">
-                    <label>Breast Size:</label>
-                    <select id="cup-min"></select>
-                    <span>-</span>
-                    <select id="cup-max"></select>
-                </div>
-                <div class="filter-group">
-                    <label>Height:</label>
-                    <div class="slider-control">
-                        <label for="height-min">Min:</label>
-                        <input type="range" id="height-min">
-                        <span id="height-min-value"></span>
-                    </div>
-                    <div class="slider-control">
-                        <label for="height-max">Max:</label>
-                        <input type="range" id="height-max">
-                        <span id="height-max-value"></span>
-                    </div>
-                </div>
-                <div class="filter-group filter-buttons">
-                    <button id="apply-filters-button">Apply Filters</button>
-                    <button id="reset-filters-button">Reset Filters</button>
-                </div>
-            </div>
-            <div class="performers-content">
-                <div class="performer-wall" id="performer-wall">
-                    <!-- Performer thumbnails will be inserted here by JavaScript -->
-                </div>
-                <div class="performer-details-panel" id="performer-details-panel">
-                <span class="close-details-button">&times;</span>
-                <div class="performer-carousel" id="performer-carousel">
-                    <!-- Large focused video and horizontal menu will be here -->
-                </div>
-                <div class="performer-info-tabs">
-                    <div class="tab-buttons">
-                        <button class="tab-button active" data-tab="performer-profile">Profile</button>
-                        <button class="tab-button" data-tab="performer-scenes">Scenes</button>
-                        <button class="tab-button" data-tab="performer-appearance">Appearance</button>
-                        <button class="tab-button" data-tab="performer-tags">Tags</button>
-                        <button class="tab-button" data-tab="performer-bios">Bios</button>
-                        <button class="tab-button" data-tab="performer-other-info">Other Info</button>
-                    </div>
-                    <div class="tab-content">
-                        <div id="performer-profile" class="tab-pane active">
-                            <div id="performer-profile-content"></div>
-                        </div>
-                        <div id="performer-scenes" class="tab-pane">
-                            <div id="performer-scenes-content" class="video-grid"></div>
-                        </div>
-                        <div id="performer-appearance" class="tab-pane">
-                            <div id="performer-appearance-content"></div>
-                        </div>
-                        <div id="performer-tags" class="tab-pane">
-                            <div id="performer-tags-content"></div>
-                        </div>
-                        <div id="performer-bios" class="tab-pane">
-                            <div id="performer-bios-content"></div>
-                        </div>
-                        <div id="performer-other-info" class="tab-pane">
-                            <div id="performer-other-info-content"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="performer-details-overlay" id="performer-details-overlay"></div>
-        </div>
-    </main>
+		<!-- Video Modal -->
+		<div class="modal fade" id="video-modal" tabindex="-1">
+			<div class="modal-dialog modal-xl modal-dialog-centered">
+				<div class="modal-content bg-dark text-light">
+					<div class="modal-header border-secondary">
+						<h5 class="modal-title">Video Details</h5>
+						<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+					</div>
+					<div class="modal-body">
+						<div class="row">
+							<div class="col-lg-8">
+								<video id="modal-video-player" class="w-100" controls></video>
+							</div>
+							<div class="col-lg-4">
+								<div id="modal-video-details"></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
 
-    <div id="video-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-button">&times;</span>
-            <div class="modal-video-container">
-                <video id="modal-video-player" controls></video>
-            </div>
-            <div class="modal-details-panel">
-                <h2>Details</h2>
-                <div id="modal-video-details"></div>
-            </div>
-        </div>
-    </div>
+		<!-- Library Modal -->
+		<div class="modal fade" id="library-modal" tabindex="-1">
+			<div class="modal-dialog">
+				<div class="modal-content bg-dark text-light">
+					<div class="modal-header border-secondary">
+						<h5 class="modal-title" id="library-modal-title">Add Library</h5>
+						<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+					</div>
+					<div class="modal-body">
+						<form id="library-form">
+							<div class="mb-3">
+								<label for="library-name" class="form-label">Name</label>
+								<input type="text" class="form-control bg-dark text-light" id="library-name" name="name" required />
+							</div>
+							<div class="mb-3">
+								<label for="library-path" class="form-label">Path</label>
+								<div class="input-group">
+									<input type="text" class="form-control bg-dark text-light" id="library-path" name="path" required />
+									<button type="button" class="btn btn-outline-secondary" id="library-path-picker">📁</button>
+								</div>
+								<input type="file" id="library-folder-input" webkitdirectory directory multiple class="d-none" />
+							</div>
+						</form>
+					</div>
+					<div class="modal-footer border-secondary">
+						<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+						<button type="submit" form="library-form" class="btn btn-primary" id="save-library-btn">Save</button>
+					</div>
+				</div>
+			</div>
+		</div>
 
-    <button id="chat-toggle-button">🤖</button>
-    <div id="chat-container" class="hidden">
-        <div id="chat-header">AI Companion</div>
-        <div id="chat-messages"></div>
-        <div id="chat-input-container">
-            <input type="text" id="chat-input" placeholder="Ask me anything...">
-            <button id="chat-send-button">Send</button>
-        </div>
-    </div>
+		<!-- Delete Library Modal -->
+		<div class="modal fade" id="delete-library-modal" tabindex="-1">
+			<div class="modal-dialog">
+				<div class="modal-content bg-dark text-light">
+					<div class="modal-header border-secondary">
+						<h5 class="modal-title">Delete Library</h5>
+						<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+					</div>
+					<div class="modal-body">
+						<p id="delete-library-message">Are you sure you want to delete this library?</p>
+					</div>
+					<div class="modal-footer border-secondary">
+						<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+						<button type="button" class="btn btn-danger" id="confirm-delete-library-btn">Delete</button>
+					</div>
+				</div>
+			</div>
+		</div>
 
-    <script src="app.js"></script>
-    <div id="context-menu" class="context-menu">
-        <ul>
-            <li id="set-as-default-button">Set as default</li>
-            <li id="fetch-metadata-button">Fetch Metadata</li>
-            <li id="reset-metadata-button">Reset Metadata</li>
-            <li id="reset-previews-button">Reset Previews</li>
-        </ul>
-    </div>
+		<!-- Chat Container -->
+		<button id="chat-toggle-button" class="btn btn-primary rounded-circle position-fixed bottom-0 end-0 m-4" style="width: 60px; height: 60px">🤖</button>
 
-	<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
-</body>
+		<div id="chat-container" class="position-fixed bottom-0 end-0 m-4 d-none" style="width: 350px; height: 500px">
+			<div class="card bg-dark text-light h-100 border-secondary">
+				<div class="card-header bg-primary text-white" id="chat-header" style="cursor: pointer">AI Companion</div>
+				<div class="card-body d-flex flex-column p-2" style="overflow: hidden">
+					<div id="chat-messages" class="flex-grow-1 overflow-auto mb-2"></div>
+					<div class="input-group">
+						<input type="text" id="chat-input" class="form-control bg-dark text-light" placeholder="Ask me anything..." />
+						<button id="chat-send-button" class="btn btn-primary">Send</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Context Menu (will be positioned dynamically) -->
+		<div id="context-menu" class="dropdown-menu bg-dark" style="display: none; position: absolute">
+			<a class="dropdown-item text-light" href="#" id="set-as-default-button">Set as default</a>
+			<a class="dropdown-item text-light" href="#" id="fetch-metadata-button">Fetch Metadata</a>
+			<a class="dropdown-item text-light" href="#" id="reset-metadata-button">Reset Metadata</a>
+			<a class="dropdown-item text-light" href="#" id="reset-previews-button">Reset Previews</a>
+		</div>
+
+		<div id="libraries-context-menu" class="dropdown-menu bg-dark" style="display: none; position: absolute">
+			<a class="dropdown-item text-light" href="#" id="edit-library-menu">✏️ Edit Library</a>
+			<a class="dropdown-item text-light" href="#" id="delete-library-menu">🗑️ Delete Library</a>
+			<a class="dropdown-item text-light" href="#" id="set-default-library-menu">⭐ Set as Default</a>
+		</div>
+
+		<!-- Bootstrap JS Bundle -->
+		<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+		<!-- Custom JS -->
+		<script src="app.js"></script>
+	</body>
 </html>
