@@ -12,11 +12,24 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"video-organizer/internal/appstatus"
 	"video-organizer/internal/config"
 	"video-organizer/internal/database"
 	"video-organizer/internal/models"
+)
+
+var (
+	// HTTP client with timeout for external API calls
+	httpClient = &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     90 * time.Second,
+		},
+	}
 )
 
 func FetchPerformerData(performerName string) ([]byte, error) {
@@ -26,9 +39,12 @@ func FetchPerformerData(performerName string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new request for Adultdatalink API for %s: %w", performerName, err)
 	}
-	req.Header.Add("Authorization", "raA8-fkxPODxiwx7WM05wZFy9LBtEmm7g3VGsJ0MjDE") // Add Authorization header
 
-	resp, err := http.DefaultClient.Do(req) // Use DefaultClient to send the request
+	// Get API key from config
+	cfg := config.Get()
+	req.Header.Add("Authorization", cfg.API.AdultDataLinkKey)
+
+	resp, err := httpClient.Do(req) // Use custom client with timeout
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch data from Adultdatalink API for %s: %w", performerName, err)
 	}

@@ -1,2 +1,10 @@
-2025/11/04 00:12:51 database.go:114: Database initialized and performers table ensured.
-2025/11/04 00:12:54 main.go:23: Application starting...
+2025/11/04 01:36:40 main.go:27: === Video Organizer Starting ===
+2025/11/04 01:36:40 main.go:34: Configuration loaded successfully
+2025/11/04 01:36:40 main.go:35: Server will listen on localhost:8080
+2025/11/04 01:36:40 database.go:148: Database initialized with connection pooling and performance optimizations
+2025/11/04 01:36:40 main.go:43: Database initialized
+2025/11/04 01:36:40 main.go:50: Auto-scan enabled, scanning for new performers...
+2025/11/04 01:36:41 main.go:56: Video cache initialized
+2025/11/04 01:36:41 main.go:113: HTTP routes configured
+2025/11/04 01:36:41 main.go:63: Starting server at http://localhost:8080
+2025/11/04 01:36:41 main.go:64: Press Ctrl+C to stop

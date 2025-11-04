@@ -1,34 +1,114 @@
-# Created by https://www.toptal.com/developers/gitignore/api/go
-# Edit at https://www.toptal.com/developers/gitignore?templates=go
-
-### Go ###
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
-# Binaries for programs and plugins
+# Binaries
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-assets
-.performers
-.thumbnails
-*.log
-old_logs
-app.log
-*.db
+video-organizer
+video-organizer.exe
 
 # Test binary, built with `go test -c`
 *.test
 
-# Output of the go coverage tool, specifically when used with LiteIDE
+# Output of the go coverage tool
 *.out
-
-# Dependency directories (remove the comment below to include it)
-# vendor/
+coverage.txt
+coverage.html
 
 # Go workspace file
 go.work
 
-# End of https://www.toptal.com/developers/gitignore/api/go
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+video_organizer.db*
+
+# Log files
+*.log
+app.log
+old_logs/
+
+# Thumbnails and cache
+frontend/.thumbnails/
+frontend/.performers/
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+
+# Video files (don't commit actual videos!)
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.webm
+*.flv
+*.wmv
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+build/
+bin/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Node modules (if you add frontend build tools)
+node_modules/
+package-lock.json
+yarn.lock
+
+# OS-specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Debug files
+debug
+*.pprof
+
+# Local configuration overrides
+config.local.yaml
+config.local.json
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Private keys and certificates
+*.pem
+*.key
+*.cert
+*.crt
+
+# Documentation builds
+docs/_build/
+site/
+
+# Frontend build artifacts
+frontend/dist/
+frontend/build/

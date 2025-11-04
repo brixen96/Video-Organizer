@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"video-organizer/internal/appstatus"
 	"video-organizer/internal/config"
@@ -16,11 +17,16 @@ import (
 	"video-organizer/internal/models"
 )
 
-var VideoCache map[string]models.VideoInfo
+var (
+	VideoCache map[string]models.VideoInfo
+	cacheMutex sync.RWMutex
+)
 
 func InitializeVideoCache() {
 	appstatus.EmitInfo("[Task]", "Starting video cache initialization")
+	cacheMutex.Lock()
 	VideoCache = make(map[string]models.VideoInfo)
+	cacheMutex.Unlock()
 
 	// Get all performer names from the database
 	performerNames, err := database.GetAllPerformerNames()
@@ -35,34 +41,58 @@ func InitializeVideoCache() {
 		log.Fatalf("Failed to read video directory for cache initialization: %v", err)
 	}
 
-	processedCount := 0
-	totalVideoCount := 0
-	// Pre-count video files for progress tracking
+	// Count video files and collect jobs
+	var videoJobs []VideoProcessingJob
 	for _, file := range files {
 		if !file.IsDir() {
 			ext := strings.ToLower(filepath.Ext(file.Name()))
 			if ext == ".mp4" || ext == ".mkv" || ext == ".avi" || ext == ".mov" {
-				totalVideoCount++
+				videoPath := filepath.Join(config.VideoDir, file.Name())
+				videoJobs = append(videoJobs, VideoProcessingJob{
+					FileName:       file.Name(),
+					VideoPath:      videoPath,
+					PerformerNames: performerNames,
+				})
 			}
 		}
 	}
+	totalVideoCount := len(videoJobs)
 	appstatus.EmitInfo("[Info]", fmt.Sprintf("Found %d video files to process", totalVideoCount))
 
-	for _, file := range files {
-		if !file.IsDir() {
-			ext := strings.ToLower(filepath.Ext(file.Name()))
-			if ext == ".mp4" || ext == ".mkv" || ext == ".avi" || ext == ".mov" {
-				processedCount++
-				videoPath := filepath.Join(config.VideoDir, file.Name())
-				videoInfo := GenerateVideoInfo(file.Name(), videoPath, performerNames)
-				VideoCache[file.Name()] = videoInfo
-				if processedCount%5 == 0 || processedCount == totalVideoCount { // Report progress every 5 files
-					appstatus.EmitInfo("[Progress]", fmt.Sprintf("Processed %d/%d videos", processedCount, totalVideoCount))
-				}
-			}
+	if totalVideoCount == 0 {
+		appstatus.EmitInfo("[Task]", "No videos found to process")
+		return
+	}
+
+	// Create worker pool (number of workers = number of CPU cores, max 8)
+	numWorkers := min(8, max(1, totalVideoCount/10)) // Scale workers based on video count
+	appstatus.EmitInfo("[Info]", fmt.Sprintf("Starting %d workers for parallel processing", numWorkers))
+
+	pool := NewWorkerPool(numWorkers)
+	pool.Start()
+
+	// Submit all jobs
+	go func() {
+		for _, job := range videoJobs {
+			pool.Submit(job)
+		}
+		pool.Close()
+	}()
+
+	// Collect results
+	processedCount := 0
+	for result := range pool.Results() {
+		processedCount++
+
+		cacheMutex.Lock()
+		VideoCache[result.VideoInfo.Name] = result.VideoInfo
+		cacheMutex.Unlock()
+
+		if processedCount%5 == 0 || processedCount == totalVideoCount {
+			appstatus.EmitInfo("[Progress]", fmt.Sprintf("Processed %d/%d videos", processedCount, totalVideoCount))
 		}
 	}
-	
+
 	appstatus.EmitInfo("[Task]", fmt.Sprintf("Video cache initialized with %d videos", len(VideoCache)))
 
 	// Update performer scene counts in the database
@@ -70,7 +100,37 @@ func InitializeVideoCache() {
 }
 
 func GetVideoCache() map[string]models.VideoInfo {
-	return VideoCache
+	cacheMutex.RLock()
+	defer cacheMutex.RUnlock()
+
+	// Return a copy to prevent external modifications
+	cache := make(map[string]models.VideoInfo, len(VideoCache))
+	for k, v := range VideoCache {
+		cache[k] = v
+	}
+	return cache
+}
+
+// GetVideoByName retrieves a single video from cache (thread-safe)
+func GetVideoByName(name string) (models.VideoInfo, bool) {
+	cacheMutex.RLock()
+	defer cacheMutex.RUnlock()
+	video, exists := VideoCache[name]
+	return video, exists
+}
+
+// UpdateVideoInCache updates a single video in cache (thread-safe)
+func UpdateVideoInCache(name string, video models.VideoInfo) {
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+	VideoCache[name] = video
+}
+
+// DeleteVideoFromCache removes a video from cache (thread-safe)
+func DeleteVideoFromCache(name string) {
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+	delete(VideoCache, name)
 }
 
 func GenerateVideoInfo(fileName, videoPath string, performerNames []string) models.VideoInfo {
@@ -131,12 +191,15 @@ func UpdatePerformerSceneCounts() {
 	appstatus.EmitInfo("[Task]", "Starting performer scene count update")
 	performerSceneCounts := make(map[string]int)
 
-	// Count scenes per performer
+	// Count scenes per performer (read lock for cache access)
+	cacheMutex.RLock()
 	for _, video := range VideoCache {
 		for _, pName := range video.Performers {
 			performerSceneCounts[pName]++
 		}
 	}
+	cacheMutex.RUnlock()
+
 	appstatus.EmitInfo("[Info]", fmt.Sprintf("Found %d performers with scenes", len(performerSceneCounts)))
 
 	// Update database
@@ -188,4 +251,20 @@ func UpdatePerformerSceneCounts() {
 		}
 	}
 	appstatus.EmitInfo("[Task]", "Completed performer scene count update")
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// max returns the maximum of two integers
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

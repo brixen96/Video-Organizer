@@ -4,9 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 
+	"video-organizer/internal/config"
 	"video-organizer/internal/models"
 )
 
@@ -79,6 +81,17 @@ func InitDB() {
 		log.Fatalf("Failed to open database: %v", err)
 	}
 
+	// Configure connection pool for optimal performance
+	cfg := config.Get()
+	db.SetMaxOpenConns(cfg.Database.MaxOpenConns)
+	db.SetMaxIdleConns(cfg.Database.MaxIdleConns)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
+	// Verify connection is working
+	if err = db.Ping(); err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+
 	sqlStmt := `
 	CREATE TABLE IF NOT EXISTS performers (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,12 +119,33 @@ func InitDB() {
 		key TEXT PRIMARY KEY,
 		value TEXT
 	);
+
+	-- Performance indexes
+	CREATE INDEX IF NOT EXISTS idx_performers_name ON performers(name);
+	CREATE INDEX IF NOT EXISTS idx_monitor_events_timestamp ON monitor_events(timestamp);
+	CREATE INDEX IF NOT EXISTS idx_monitor_events_category ON monitor_events(category);
+	CREATE INDEX IF NOT EXISTS idx_libraries_is_default ON libraries(is_default);
 	`
 	_, err = db.Exec(sqlStmt)
 	if err != nil {
-		log.Fatalf("Failed to create tables: %v", err)
+		log.Fatalf("Failed to create tables and indexes: %v", err)
 	}
-	log.Println("Database initialized and performers table ensured.")
+
+	// Enable SQLite optimizations
+	_, err = db.Exec("PRAGMA journal_mode=WAL")
+	if err != nil {
+		log.Printf("Warning: Failed to enable WAL mode: %v", err)
+	}
+	_, err = db.Exec("PRAGMA synchronous=NORMAL")
+	if err != nil {
+		log.Printf("Warning: Failed to set synchronous mode: %v", err)
+	}
+	_, err = db.Exec("PRAGMA cache_size=10000")
+	if err != nil {
+		log.Printf("Warning: Failed to set cache size: %v", err)
+	}
+
+	log.Println("Database initialized with connection pooling and performance optimizations")
 }
 
 func GetDB() *sql.DB {
